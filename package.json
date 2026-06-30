@@ -1,0 +1,12 @@
+{
+  "name": "amber-pcos",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Amber LifeSciences — Pharma Commercial Operating System (SFA/CRM/CLM/Approvals/AI)",
+  "scripts": {
+    "start": "node server/server.js"
+  },
+  "engines": {
+    "node": "22.x"
+  }
+}

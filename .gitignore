@@ -1,0 +1,25 @@
+# Runtime data — NEVER commit the live database or the JWT signing secret
+server/data/
+*.db
+*.db-wal
+*.db-shm
+.secret
+
+# Dependencies
+node_modules/
+
+# Harness / editor / OS
+.claude/
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
+
+# Temp / scratch
+_pdftmp/
+_pdfx.js
+_pdf*
+_d1/
+_d2/
+_dx/
+*.log

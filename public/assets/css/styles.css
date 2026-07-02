@@ -77,11 +77,13 @@ button{font-family:inherit;cursor:pointer}
 .sidebar .logo .mark{box-shadow:0 2px 10px rgba(18,168,132,.35)}
 .nav-group{font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:#5e7a72;margin:16px 11px 6px;font-weight:700}
 .nav a{display:flex;align-items:center;gap:11px;padding:8px 11px;border-radius:8px;color:#b9cac4;font-weight:500;font-size:13px;margin:1px 0;transition:background .12s,color .12s;position:relative}
-.nav a .ic{width:18px;text-align:center;opacity:.85;font-size:14px}
+.nav a .ic{width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;color:#5fae9a;opacity:.92;flex:none}
+.nav a .ic svg{width:18px;height:18px;display:block}
+.nav a:hover .ic{color:var(--brand-2)}
 .nav a:hover{background:#13332c;color:#fff}
 .nav a.active{background:#12a8841f;color:#fff;font-weight:600}
 .nav a.active::before{content:"";position:absolute;left:-12px;top:7px;bottom:7px;width:3px;border-radius:0 3px 3px 0;background:var(--brand-2)}
-.nav a.active .ic{opacity:1}
+.nav a.active .ic{opacity:1;color:var(--brand-2)}
 
 .topbar{grid-area:top;background:rgba(255,255,255,.85);backdrop-filter:saturate(1.2) blur(6px);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:14px;padding:0 22px;height:60px;position:sticky;top:0;z-index:20}
 .topbar h2{font-size:16px;margin:0;font-weight:650}
@@ -323,6 +325,9 @@ html.is-mobile .viewbtn .vb-phone{display:none}
 .dbx-feed-txt b{font-weight:700;color:var(--ink)}
 .dbx-feed-txt .lk{color:#6d5ae6;font-weight:650}
 .dbx-feed-txt .t{color:var(--muted);font-size:11.5px;margin-top:2px}
+.dbx-dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:5px;vertical-align:middle}
+.dbx-dot.ok{background:#0e9f6e}
+.dbx-dot.bad{background:#e02424}
 
 @media(max-width:1000px){
   .dbx-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}

@@ -454,20 +454,60 @@
   // ---- AUTH (portals · role login · signup) ------------------------------
   let authScreen = 'landing', authRole = null;
   const ROLE_PORTALS = [
-    { role: 'Business Head', icon: '🏢', color: '#0c5c4c', blurb: 'Division P&L · all-region visibility · targets', demo: 'vikram@amber.test' },
-    { role: 'RBM', icon: '🗺️', color: '#10a37f', blurb: 'Regional performance · escalation approvals', demo: 'anita@amber.test' },
-    { role: 'ABM', icon: '📍', color: '#2563eb', blurb: 'Area execution · raise approval requests', demo: 'rohit@amber.test' },
-    { role: 'TSM', icon: '🩺', color: '#7c3aed', blurb: 'Daily field visits · RCPA · samples', demo: 'karan@amber.test' },
-    { role: 'PMT', icon: '📣', color: '#e0a106', blurb: 'Campaigns · CLM content · scientific briefs', demo: 'meera@amber.test' },
-    { role: 'Accounts', icon: '💰', color: '#0891b2', blurb: 'Stock · spend · budgets · final approvals', demo: 'sanjay@amber.test' },
-    { role: 'Admin', icon: '⚙️', color: '#475569', blurb: 'Users · master data · tenant configuration', demo: 'admin@amber.test' },
+    { role: 'Business Head', color: '#0c5c4c', blurb: 'Division P&L · all-region visibility · targets', demo: 'vikram@amber.test' },
+    { role: 'RBM', color: '#10a37f', blurb: 'Regional performance · escalation approvals', demo: 'anita@amber.test' },
+    { role: 'ABM', color: '#2563eb', blurb: 'Area execution · raise approval requests', demo: 'rohit@amber.test' },
+    { role: 'TSM', color: '#7c3aed', blurb: 'Daily field visits · RCPA · samples', demo: 'karan@amber.test' },
+    { role: 'PMT', color: '#e0a106', blurb: 'Campaigns · CLM content · scientific briefs', demo: 'meera@amber.test' },
+    { role: 'Accounts', color: '#0891b2', blurb: 'Stock · spend · budgets · final approvals', demo: 'sanjay@amber.test' },
+    { role: 'Admin', color: '#475569', blurb: 'Users · master data · tenant configuration', demo: 'admin@amber.test' },
   ];
+  // clean SVG line-icons per role (replaces emoji)
+  const ROLE_ICONS = {
+    'Business Head': _si('<path d="M3 21h18"/><path d="M5 21V4a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v17"/><path d="M15 21v-9h3a1 1 0 0 1 1 1v8"/><line x1="8" y1="7" x2="12" y2="7"/><line x1="8" y1="11" x2="12" y2="11"/><line x1="8" y1="15" x2="12" y2="15"/>'),
+    RBM: _si('<polygon points="1 6 8 3 16 6 23 3 23 18 16 21 8 18 1 21 1 6"/><line x1="8" y1="3" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="21"/>'),
+    ABM: _si('<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="2.8"/>'),
+    TSM: _si('<path d="M22 12h-4l-3 8L9 4l-3 8H2"/>'),
+    PMT: _si('<path d="M3 11v2a1 1 0 0 0 1 1h2l3.5 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M15 8.5a4 4 0 0 1 0 7"/><path d="M18.5 5a8 8 0 0 1 0 14"/>'),
+    Accounts: _si('<rect x="2.5" y="5.5" width="19" height="14" rx="2.5"/><path d="M2.5 10h19"/><circle cx="17" cy="15" r="1.3"/>'),
+    Admin: _si('<path d="M12 2 4 5v6c0 5 3.5 8.6 8 10 4.5-1.4 8-5 8-10V5l-8-3z"/><path d="m9 12 2 2 4-4"/>'),
+  };
+  const FEAT_ICONS = {
+    map: _si('<polygon points="1 6 8 3 16 6 23 3 23 18 16 21 8 18 1 21 1 6"/><line x1="8" y1="3" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="21"/>'),
+    chart: _si('<line x1="6" y1="20" x2="6" y2="13"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="18" y1="20" x2="18" y2="9"/>'),
+    shield: _si('<path d="M12 2 4 5v6c0 5 3.5 8.6 8 10 4.5-1.4 8-5 8-10V5l-8-3z"/><path d="m9 12 2 2 4-4"/>'),
+  };
   const SIGNUP_DIVISIONS = [['DIV1', 'Cardiac Care'], ['DIV2', 'Diabetic & Endo'], ['DIV3', 'Gastro'], ['DIV4', 'Ortho & Pain']];
+
+  // shared split-screen auth shell: branded aside + form column
+  function authShell(box) {
+    return `
+      <div class="auth-shell">
+        <div class="auth-aside">
+          <div class="auth-aside-in">
+            <div class="logo lg"><span class="mark">A</span> Amber LifeSciences</div>
+            <h1>Pharma Commercial Operating System</h1>
+            <p>Field-force automation, RCPA, distribution, approvals and an AI sales copilot — one platform for the entire commercial engine.</p>
+            <ul class="auth-feat">
+              <li><span class="fic">${FEAT_ICONS.map}</span> Live GPS field tracking &amp; geo-verified visits</li>
+              <li><span class="fic">${FEAT_ICONS.chart}</span> RCPA Rx-share &amp; executive analytics</li>
+              <li><span class="fic">${FEAT_ICONS.shield}</span> UCPMP-compliant approvals &amp; full audit trail</li>
+            </ul>
+            <div class="auth-aside-foot">Secure sign-in · Role-based access control</div>
+          </div>
+          <span class="orb o1"></span><span class="orb o2"></span>
+        </div>
+        <div class="auth-main"><div class="auth-box">${box}</div></div>
+      </div>`;
+  }
 
   function bindAuthLinks() {
     document.querySelectorAll('[data-auth]').forEach(a => {
       a.style.cursor = 'pointer';
       a.onclick = (e) => { e.preventDefault(); authScreen = a.dataset.auth; if (authScreen !== 'login') authRole = null; renderAuth(); };
+    });
+    document.querySelectorAll('[data-pwtoggle]').forEach(b => {
+      b.onclick = () => { const i = $('#' + b.dataset.pwtoggle); if (!i) return; const show = i.type === 'password'; i.type = show ? 'text' : 'password'; b.textContent = show ? 'Hide' : 'Show'; };
     });
   }
 
@@ -479,39 +519,35 @@
   }
 
   function renderLanding() {
-    document.body.innerHTML = `
-      <div class="login-wrap">
-        <div class="auth-card wide">
-          <div class="logo"><span class="mark">A</span> Amber LifeSciences</div>
-          <h1>Commercial Operating System</h1>
-          <p class="tag">Select your designation to sign in</p>
-          <div class="portal-grid">
-            ${ROLE_PORTALS.map(p => `<button class="portal" data-portal="${p.role}" style="--pc:${p.color}">
-              <span class="pic">${p.icon}</span><b>${p.role}</b><small>${p.blurb}</small></button>`).join('')}
-          </div>
-          <p class="tag center">New to Amber? <a data-auth="signup"><b>Create an account</b></a></p>
-        </div>
-      </div>`;
+    document.body.innerHTML = authShell(`
+      <div class="logo mob-only"><span class="mark">A</span> Amber LifeSciences</div>
+      <h2>Welcome back</h2>
+      <p class="tag">Select your designation to sign in</p>
+      <div class="portal-grid">
+        ${ROLE_PORTALS.map(p => `<button class="portal" data-portal="${p.role}" style="--pc:${p.color}">
+          <span class="pic">${ROLE_ICONS[p.role] || ''}</span><b>${p.role}</b><small>${p.blurb}</small></button>`).join('')}
+      </div>
+      <p class="tag center">New to Amber? <a data-auth="signup"><b>Create an account</b></a></p>`);
     document.querySelectorAll('[data-portal]').forEach(b => b.onclick = () => { authRole = b.dataset.portal; authScreen = 'login'; renderAuth(); });
     bindAuthLinks();
   }
 
   function renderRoleLogin(role, err) {
     const p = ROLE_PORTALS.find(x => x.role === role) || ROLE_PORTALS[0];
-    document.body.innerHTML = `
-      <div class="login-wrap">
-        <div class="auth-card" style="--pc:${p.color}">
-          <a class="back" data-auth="landing">‹ All portals</a>
-          <div class="portal-head"><span class="pic big" style="background:${p.color}">${p.icon}</span>
-            <div><div class="logo-sm">Amber LifeSciences</div><h2>${esc(role)} Login</h2></div></div>
-          <p class="tag">${esc(p.blurb)}</p>
-          <div class="field"><label>Email</label><input id="lg-email" type="email" value="${p.demo}" autocomplete="username"></div>
-          <div class="field"><label>Password</label><input id="lg-pass" type="password" value="amber123" autocomplete="current-password"></div>
-          ${err ? `<p class="err">${esc(err)}</p>` : ''}
-          <button class="btn" id="lg-go" style="background:${p.color}">Sign in as ${esc(role)}</button>
-          <p class="tag center">Not a ${esc(role)}? <a data-auth="landing">Switch portal</a> &nbsp;·&nbsp; <a data-auth="signup">Sign up</a></p>
+    document.body.innerHTML = authShell(`
+      <div style="--pc:${p.color}">
+        <a class="back" data-auth="landing">‹ All portals</a>
+        <div class="role-head" style="--pc:${p.color}"><span class="role-ic">${ROLE_ICONS[role] || ''}</span>
+          <div><div class="logo-sm">Amber LifeSciences</div><h2>${esc(role)} sign-in</h2></div></div>
+        <p class="tag">${esc(p.blurb)}</p>
+        <div class="field"><label>Email</label><input id="lg-email" type="email" value="${p.demo}" autocomplete="username"></div>
+        <div class="field"><label>Password</label>
+          <div class="pw-wrap"><input id="lg-pass" type="password" value="amber123" autocomplete="current-password"><button type="button" class="pw-toggle" data-pwtoggle="lg-pass">Show</button></div>
         </div>
-      </div>`;
+        ${err ? `<p class="err">${esc(err)}</p>` : ''}
+        <button class="btn" id="lg-go" style="background:${p.color}">Sign in as ${esc(role)}</button>
+        <p class="tag center">Not a ${esc(role)}? <a data-auth="landing">Switch portal</a> &nbsp;·&nbsp; <a data-auth="signup">Sign up</a></p>
+      </div>`);
     const go = async () => {
       const btn = $('#lg-go'); btn.textContent = 'Signing in…'; btn.disabled = true;
       try {
@@ -527,27 +563,23 @@
   function renderSignup(err, vals) {
     const v = vals || {};
     const roles = ROLE_PORTALS.filter(p => p.role !== 'Admin');
-    document.body.innerHTML = `
-      <div class="login-wrap">
-        <div class="auth-card" style="--pc:#10a37f">
-          <a class="back" data-auth="landing">‹ Back to portals</a>
-          <div class="logo"><span class="mark">A</span> Amber LifeSciences</div>
-          <h2>Create your account</h2><p class="tag">Self-register to join the Amber commercial platform</p>
-          <div class="field"><label>Full name</label><input id="su-name" value="${esc(v.name || '')}"></div>
-          <div class="field"><label>Work email</label><input id="su-email" type="email" placeholder="name@company.com" value="${esc(v.email || '')}"></div>
-          <div class="grid2">
-            <div class="field"><label>Designation</label><select id="su-role">${roles.map(r => `<option ${v.role === r.role ? 'selected' : ''}>${r.role}</option>`).join('')}</select></div>
-            <div class="field"><label>Division</label><select id="su-div">${SIGNUP_DIVISIONS.map(d => `<option value="${d[0]}" ${v.div === d[0] ? 'selected' : ''}>${d[1]}</option>`).join('')}</select></div>
-          </div>
-          <div class="grid2">
-            <div class="field"><label>Password</label><input id="su-pass" type="password" placeholder="min 6 characters"></div>
-            <div class="field"><label>Confirm password</label><input id="su-pass2" type="password"></div>
-          </div>
-          ${err ? `<p class="err">${esc(err)}</p>` : ''}
-          <button class="btn" id="su-go">Create account & sign in</button>
-          <p class="tag center">Already have an account? <a data-auth="landing">Sign in</a></p>
-        </div>
-      </div>`;
+    document.body.innerHTML = authShell(`
+      <a class="back" data-auth="landing">‹ Back to portals</a>
+      <div class="logo mob-only"><span class="mark">A</span> Amber LifeSciences</div>
+      <h2>Create your account</h2><p class="tag">Self-register to join the Amber commercial platform</p>
+      <div class="field"><label>Full name</label><input id="su-name" value="${esc(v.name || '')}"></div>
+      <div class="field"><label>Work email</label><input id="su-email" type="email" placeholder="name@company.com" value="${esc(v.email || '')}"></div>
+      <div class="grid2">
+        <div class="field"><label>Designation</label><select id="su-role">${roles.map(r => `<option ${v.role === r.role ? 'selected' : ''}>${r.role}</option>`).join('')}</select></div>
+        <div class="field"><label>Division</label><select id="su-div">${SIGNUP_DIVISIONS.map(d => `<option value="${d[0]}" ${v.div === d[0] ? 'selected' : ''}>${d[1]}</option>`).join('')}</select></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Password</label><div class="pw-wrap"><input id="su-pass" type="password" placeholder="min 6 characters"><button type="button" class="pw-toggle" data-pwtoggle="su-pass">Show</button></div></div>
+        <div class="field"><label>Confirm password</label><input id="su-pass2" type="password"></div>
+      </div>
+      ${err ? `<p class="err">${esc(err)}</p>` : ''}
+      <button class="btn" id="su-go">Create account &amp; sign in</button>
+      <p class="tag center">Already have an account? <a data-auth="landing">Sign in</a></p>`);
     $('#su-go').onclick = async () => {
       const name = $('#su-name').value.trim(), email = $('#su-email').value.trim();
       const pass = $('#su-pass').value, pass2 = $('#su-pass2').value;

@@ -379,6 +379,34 @@
   }
 
   // ---- navigation ---------------------------------------------------------
+  // clean line-icons (Feather-style) keyed by route — replaces emoji glyphs
+  const _si = (p) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+  const NAV_ICONS = {
+    dashboard: _si('<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/>'),
+    planner: _si('<path d="M9 4H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2"/><rect x="9" y="2.5" width="6" height="4" rx="1"/><path d="m9 14 2 2 4-4"/>'),
+    ai: _si('<path d="M12 3l1.8 4.4L18 9l-4.2 1.6L12 15l-1.8-4.4L6 9l4.2-1.6z"/><path d="M18.5 14.5l.8 1.9 1.9.8-1.9.8-.8 1.9-.8-1.9-1.9-.8 1.9-.8z"/>'),
+    doctors: _si('<path d="M22 12h-4l-3 8L9 4l-3 8H2"/>'),
+    chemists: _si('<rect x="2.5" y="8.5" width="19" height="7" rx="3.5"/><line x1="12" y1="8.5" x2="12" y2="15.5"/>'),
+    distributors: _si('<rect x="1" y="4" width="14" height="12" rx="1.5"/><path d="M15 8h4l4 4v4h-8z"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/>'),
+    visits: _si('<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="2.8"/>'),
+    targets: _si('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/>'),
+    rcpa: _si('<polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>'),
+    gps: _si('<polygon points="3 11 22 2 13 21 11 13 3 11"/>'),
+    campaigns: _si('<path d="M3 11v2a1 1 0 0 0 1 1h2l3.5 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M15 8.5a4 4 0 0 1 0 7"/><path d="M18.5 5a8 8 0 0 1 0 14"/>'),
+    edetailing: _si('<circle cx="12" cy="12" r="9"/><polygon points="10 8.5 16 12 10 15.5 10 8.5"/>'),
+    distribution: _si('<circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><line x1="8.3" y1="10.7" x2="15.7" y2="6.3"/><line x1="8.3" y1="13.3" x2="15.7" y2="17.7"/>'),
+    orders: _si('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/>'),
+    inventory: _si('<path d="M21 8v8a2 2 0 0 1-1 1.73l-7 4a2 2 0 0 1-2 0l-7-4A2 2 0 0 1 3 16V8"/><path d="M3.3 7 12 12l8.7-5"/><line x1="12" y1="22" x2="12" y2="12"/><path d="M3.3 7 12 2l8.7 5"/>'),
+    schemes: _si('<circle cx="12" cy="8.5" r="5.5"/><path d="M8.5 13 7 22l5-2.8L17 22l-1.5-9"/>'),
+    gifting: _si('<polyline points="20 12 20 21 4 21 4 12"/><rect x="2.5" y="7.5" width="19" height="4.5" rx="1"/><line x1="12" y1="21" x2="12" y2="7.5"/><path d="M12 7.5H8a2.5 2.5 0 0 1 0-5c3 0 4 5 4 5z"/><path d="M12 7.5h4a2.5 2.5 0 0 0 0-5c-3 0-4 5-4 5z"/>'),
+    approvals: _si('<path d="M22 11.1V12a10 10 0 1 1-5.9-9.1"/><polyline points="22 4 12 14 9 11"/>'),
+    accounts: _si('<rect x="2.5" y="5.5" width="19" height="14" rx="2.5"/><path d="M2.5 10h19"/><circle cx="17" cy="15" r="1.3"/>'),
+    reports: _si('<line x1="6" y1="20" x2="6" y2="13"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="18" y1="20" x2="18" y2="9"/>'),
+    hr: _si('<rect x="2.5" y="7.5" width="19" height="13" rx="2"/><path d="M16 20.5V5.5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v15"/>'),
+    products: _si('<path d="M9 3h6"/><path d="M10 3v5.5L5.5 17A2 2 0 0 0 7.3 20h9.4a2 2 0 0 0 1.8-3L14 8.5V3"/><line x1="8" y1="14.5" x2="16" y2="14.5"/>'),
+    team: _si('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>'),
+    settings: _si('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/>'),
+  };
   const NAV = [
     { group: 'Overview', items: [
       ['dashboard', '📊', 'Executive Dashboard'],
@@ -547,7 +575,7 @@
           <div class="logo"><span class="mark">A</span> Amber <button class="iconbtn drawer-x" data-action="closeNav" title="Close">✕</button></div>
           <nav class="nav">
             ${NAV.map(g => { const items = g.items.filter(i => canAccess(i[0])); return items.length ? `<div class="nav-group">${g.group}</div>` +
-              items.map(i => `<a href="#${i[0]}" data-route="${i[0]}" class="${i[0] === route ? 'active' : ''}"><span class="ic">${i[1]}</span>${i[2]}</a>`).join('') : ''; }).join('')}
+              items.map(i => `<a href="#${i[0]}" data-route="${i[0]}" class="${i[0] === route ? 'active' : ''}"><span class="ic">${NAV_ICONS[i[0]] || i[1]}</span>${i[2]}</a>`).join('') : ''; }).join('')}
           </nav>
         </aside>
         <header class="topbar">

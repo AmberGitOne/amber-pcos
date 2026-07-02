@@ -141,6 +141,69 @@
     </svg>`;
   }
 
+  // ---- Dashbase-style helpers --------------------------------------------
+  // Catmull-Rom → cubic bezier for a smooth curve through points
+  function smoothPath(pts) {
+    if (pts.length < 2) return pts.map((p, i) => `${i ? 'L' : 'M'}${p[0]} ${p[1]}`).join(' ');
+    let d = `M${pts[0][0]} ${pts[0][1]}`;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || p2;
+      const c1x = p1[0] + (p2[0] - p0[0]) / 6, c1y = p1[1] + (p2[1] - p0[1]) / 6;
+      const c2x = p2[0] - (p3[0] - p1[0]) / 6, c2y = p2[1] - (p3[1] - p1[1]) / 6;
+      d += ` C${c1x.toFixed(1)} ${c1y.toFixed(1)}, ${c2x.toFixed(1)} ${c2y.toFixed(1)}, ${p2[0]} ${p2[1]}`;
+    }
+    return d;
+  }
+  // smooth filled area chart (Dashbase "Revenue Overview" style)
+  function areaChart(data, w = 640, h = 250, series = 'both') {
+    if (!data.length) return '<p class="muted">No data for this period.</p>';
+    const keys = series === 'primary' ? ['primary'] : series === 'secondary' ? ['secondary'] : ['primary', 'secondary'];
+    const padL = 36, padR = 14, padT = 14, padB = 26;
+    const max = Math.max(1, ...data.flatMap(d => keys.map(k => d[k]))) * 1.18;
+    const X = i => data.length === 1 ? w / 2 : padL + i * (w - padL - padR) / (data.length - 1);
+    const Y = v => padT + (1 - v / max) * (h - padT - padB);
+    const COL = { primary: '#6d5ae6', secondary: '#f59e0b' };
+    const grid = [0, .25, .5, .75, 1].map(t => {
+      const y = padT + t * (h - padT - padB), val = Math.round(max * (1 - t));
+      return `<line x1="${padL}" x2="${w - padR}" y1="${y.toFixed(1)}" y2="${y.toFixed(1)}" stroke="#eef1f5"/><text x="${padL - 8}" y="${(y + 3).toFixed(1)}" font-size="10" fill="#94a3b8" text-anchor="end">${val}</text>`;
+    }).join('');
+    const xlabels = data.map((d, i) => `<text x="${X(i).toFixed(1)}" y="${h - 7}" font-size="10.5" fill="#94a3b8" text-anchor="middle">${d.m}</text>`).join('');
+    let defs = '', body = '';
+    keys.forEach(k => {
+      const pts = data.map((d, i) => [+X(i).toFixed(1), +Y(d[k]).toFixed(1)]);
+      const line = smoothPath(pts);
+      if (k === 'primary') {
+        defs += `<linearGradient id="dbxg" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="${COL.primary}" stop-opacity=".30"/><stop offset="1" stop-color="${COL.primary}" stop-opacity="0"/></linearGradient>`;
+        body += `<path d="${line} L${X(data.length - 1).toFixed(1)} ${Y(0).toFixed(1)} L${X(0).toFixed(1)} ${Y(0).toFixed(1)} Z" fill="url(#dbxg)"/>`;
+      }
+      body += `<path d="${line}" fill="none" stroke="${COL[k]}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>`;
+      body += data.map((d, i) => `<circle cx="${X(i).toFixed(1)}" cy="${Y(d[k]).toFixed(1)}" r="11" fill="transparent"><title>${d.m} — Primary ₹${d.primary}L · Secondary ₹${d.secondary}L</title></circle><circle cx="${X(i).toFixed(1)}" cy="${Y(d[k]).toFixed(1)}" r="3.4" fill="#fff" stroke="${COL[k]}" stroke-width="2.2" pointer-events="none"/>`).join('');
+    });
+    return `<svg width="100%" viewBox="0 0 ${w} ${h}" style="display:block;max-width:100%">${defs ? '<defs>' + defs + '</defs>' : ''}${grid}${body}${xlabels}</svg>`;
+  }
+  const DBX_ICONS = {
+    revenue: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>',
+    users: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+    activity: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
+    approvals: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
+  };
+  function dbxDelta(txt, dir) { return `<span class="dbx-delta ${dir}">${dir === 'up' ? '▲' : dir === 'down' ? '▼' : '•'} ${esc(txt)}</span>`; }
+  const DBX_AV = ['#6d5ae6', '#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#0891b2', '#8b5cf6'];
+  function dbxAvatar(name, i) {
+    const n = (name || '?').trim();
+    const init = (n.split(/\s+/).map(w => w[0]).join('').slice(0, 2) || '?').toUpperCase();
+    return `<div class="dbx-av" style="background:${DBX_AV[i % DBX_AV.length]}">${esc(init)}</div>`;
+  }
+  function dbxAgo(dateStr) {
+    const days = Math.round((new Date(today()) - new Date(dateStr)) / 86400000);
+    if (isNaN(days)) return dateStr || '';
+    if (days <= 0) return 'today';
+    if (days === 1) return 'yesterday';
+    if (days < 7) return days + ' days ago';
+    if (days < 30) return Math.floor(days / 7) + 'w ago';
+    return Math.floor(days / 30) + 'mo ago';
+  }
+
   // owner of a stock item can be a chemist or a distributor
   function ownerName(id) {
     const s = D.get();
@@ -537,87 +600,107 @@
       const periodLabel = { month: 'This Month', quarter: 'This Quarter', ytd: 'Year to Date' }[st.period];
       const divName = st.division === 'all' ? 'All Divisions' : D.divName(st.division);
 
+      const platinum = doctors.filter(d => d.tier === 'Platinum').length;
+      const firstName = (session && session.name ? session.name : 'there').split(/\s+/)[0];
+
       const kpis = [
-        { label: 'Revenue · ' + periodLabel, val: '₹' + revenue + 'L', pct: Math.min(revenue, 100), route: 'accounts', delta: '▲ ' + m.revenueGrowth + '% YoY' },
-        { label: 'Active Doctors', val: doctors.length, pct: doctors.length * 8, route: 'doctors', delta: doctors.filter(d => d.tier === 'Platinum').length + ' Platinum' },
-        { label: 'Field Visits', val: visits.length, pct: visits.length * 10, route: 'visits', delta: commits + ' units committed' },
-        { label: 'Pending Approvals', val: pendingAppr.length, pct: pendingAppr.length * 20, route: 'approvals', delta: 'awaiting action' },
+        { label: 'Total Revenue', val: '₹' + revenue + 'L', icon: 'revenue', tone: 'green', route: 'accounts', delta: dbxDelta(m.revenueGrowth + '% YoY', 'up') },
+        { label: 'Active Doctors', val: doctors.length, icon: 'users', tone: 'blue', route: 'doctors', delta: dbxDelta(platinum + ' Platinum', platinum ? 'up' : 'flat') },
+        { label: 'Field Visits', val: visits.length, icon: 'activity', tone: 'amber', route: 'visits', delta: dbxDelta(commits + ' units committed', 'up') },
+        { label: 'Pending Approvals', val: pendingAppr.length, icon: 'approvals', tone: 'violet', route: 'approvals', delta: pendingAppr.length ? dbxDelta('awaiting action', 'down') : dbxDelta('all clear', 'up') },
       ];
 
-      const periodChips = [['month', 'Month'], ['quarter', 'Quarter'], ['ytd', 'YTD']]
-        .map(p => `<span class="chip ${st.period === p[0] ? 'active' : ''}" data-action="dashPeriod" data-period="${p[0]}">${p[1]}</span>`).join('');
-      const divChips = [['all', 'All Divisions'], ...s.divisions.map(d => [d.id, d.name])]
-        .map(d => `<span class="chip ${st.division === d[0] ? 'active' : ''}" data-action="dashDiv" data-div="${d[0]}">${esc(d[1])}</span>`).join('');
+      const seg = (action, dataKey, opts, cur) => `<div class="dbx-seg">${opts.map(o => `<span class="${cur === o[0] ? 'active' : ''}" data-action="${action}" data-${dataKey}="${o[0]}">${esc(o[1])}</span>`).join('')}</div>`;
+      const periodSeg = seg('dashPeriod', 'period', [['month', 'Month'], ['quarter', 'Quarter'], ['ytd', 'YTD']], st.period);
+      const divSeg = seg('dashDiv', 'div', [['all', 'All'], ...s.divisions.map(d => [d.id, d.name.split(' ')[0]])], st.division);
+      const seriesSeg = seg('dashSeries', 'series', [['both', 'Both'], ['primary', 'Primary'], ['secondary', 'Secondary']], st.series);
 
       const divBars = s.divisions.map((d, i) => ({
         label: d.name.split(' ')[0], val: [68, 54, 41, 47][i],
-        color: ['#10a37f', '#0c5c4c', '#3b82f6', '#f5a524'][i],
+        color: ['#6d5ae6', '#3b82f6', '#10b981', '#f59e0b'][i % 4],
         action: 'dashDiv', div: d.id, tip: d.name + ' — ' + [68, 54, 41, 47][i] + '% of target', active: st.division === d.id,
       }));
 
       const recent = visits.slice().sort((a, b) => a.date < b.date ? 1 : -1).slice(0, 6);
 
       return `
-      <div class="card" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
-        <div class="flex" style="flex-wrap:wrap;gap:16px">
-          <div><div class="muted" style="font-size:11px;font-weight:700;text-transform:uppercase">Period</div><div class="chip-row" style="margin-top:4px">${periodChips}</div></div>
-          <div><div class="muted" style="font-size:11px;font-weight:700;text-transform:uppercase">Division</div><div class="chip-row" style="margin-top:4px">${divChips}</div></div>
+      <div class="dbx">
+        <div class="dbx-hero">
+          <div>
+            <h1>Welcome back, ${esc(firstName)} 👋</h1>
+            <p>Here's what's happening across ${esc(divName)} — ${periodLabel.toLowerCase()}.</p>
+          </div>
+          <button class="dbx-btn" data-route="visits">View field activity <span aria-hidden="true">→</span></button>
         </div>
-        <div class="flex">
-          <button class="btn ghost sm" data-action="dashRefresh">↻ Refresh</button>
-          <button class="btn ghost sm" data-action="dashExport">⬇ Export CSV</button>
+
+        <div class="dbx-toolbar">
+          <div class="flex" style="gap:14px;flex-wrap:wrap;align-items:center">
+            <div class="flex" style="gap:8px;align-items:center"><span class="dbx-tl">Period</span>${periodSeg}</div>
+            <div class="flex" style="gap:8px;align-items:center"><span class="dbx-tl">Division</span>${divSeg}</div>
+          </div>
+          <div class="flex" style="gap:8px">
+            <button class="btn ghost sm" data-action="dashRefresh">↻ Refresh</button>
+            <button class="btn ghost sm" data-action="dashExport">⬇ Export CSV</button>
+          </div>
         </div>
-      </div>
 
-      <div class="grid cols-4 mt">
-        ${kpis.map(k => `<div class="card kpi" data-route="${k.route}" style="cursor:pointer">
-          <span class="label">${k.label}</span>
-          <span class="val">${k.val}</span>
-          <div class="bar"><i style="width:${Math.min(Math.max(k.pct, 4), 100)}%"></i></div>
-          <span class="delta up">${k.delta} ›</span>
-        </div>`).join('')}
-      </div>
-
-      <div class="grid cols-2 mt">
-        <div class="card">
-          <div class="between"><h3>Primary vs Secondary Sales</h3>
-            <div class="chip-row">${[['both', 'Both'], ['primary', 'Primary'], ['secondary', 'Secondary']].map(o => `<span class="chip ${st.series === o[0] ? 'active' : ''}" data-action="dashSeries" data-series="${o[0]}">${o[1]}</span>`).join('')}</div></div>
-          <div class="sub">₹ lakh · ${periodLabel} · hover points for detail</div>
-          ${lineChart(trend, 560, 200, st.series)}
-          <div class="legend">${st.series !== 'secondary' ? '<span><i style="background:#10a37f"></i>Primary</span>' : ''}${st.series !== 'primary' ? '<span><i style="background:#f5a524"></i>Secondary</span>' : ''}</div>
+        <div class="dbx-kpis">
+          ${kpis.map(k => `<div class="dbx-kpi ${st.division !== 'all' && k.route === 'doctors' ? 'sel' : ''}" data-route="${k.route}">
+            <div class="dbx-kpi-top">
+              <span class="dbx-kpi-label">${k.label}</span>
+              <span class="dbx-kpi-icon ${k.tone}">${DBX_ICONS[k.icon]}</span>
+            </div>
+            <div class="dbx-kpi-val">${k.val}</div>
+            ${k.delta}
+          </div>`).join('')}
         </div>
-        <div class="card">
-          <h3>Division Performance</h3><div class="sub">Target achievement % · click a bar to filter (${esc(divName)})</div>
-          ${barChart(divBars)}
+
+        <div class="dbx-split">
+          <div class="dbx-card">
+            <div class="dbx-card-head">
+              <div><h3>Sales Overview</h3><div class="s">Primary vs secondary · ₹ lakh · ${periodLabel}</div></div>
+              ${seriesSeg}
+            </div>
+            ${areaChart(trend, 640, 250, st.series)}
+            <div class="legend" style="margin-top:4px">${st.series !== 'secondary' ? '<span><i style="background:#6d5ae6"></i>Primary</span>' : ''}${st.series !== 'primary' ? '<span><i style="background:#f59e0b"></i>Secondary</span>' : ''}</div>
+          </div>
+          <div class="dbx-card">
+            <div class="dbx-card-head"><div><h3>Recent Activity</h3><div class="s">Latest field check-ins</div></div><a class="dbx-link" data-route="visits" href="#visits">View all</a></div>
+            <div class="dbx-feed">
+              ${recent.length ? recent.map((v, i) => {
+                const name = v.type === 'Doctor' ? D.docName(v.targetId) : D.chemName(v.targetId);
+                return `<div class="dbx-feed-item" data-action="view" data-res="visits" data-id="${v.id}">
+                  ${dbxAvatar(D.empName(v.rep), i)}
+                  <div class="dbx-feed-txt"><b>${esc(D.empName(v.rep))}</b> ${v.type === 'Doctor' ? 'visited' : 'called on'} <span class="lk">${esc(name)}</span>${v.commitment ? ` · <b>${v.commitment}</b> units` : ''}<div class="t">${v.geoVerified ? '✓ geo-verified' : '⚠ unverified'} · ${dbxAgo(v.date)}</div></div>
+                </div>`;
+              }).join('') : '<p class="muted">No activity for ' + esc(divName) + '.</p>'}
+            </div>
+          </div>
         </div>
-      </div>
 
-      <div class="grid cols-3 mt">
-        ${[['Doctor Coverage', m.doctorCoverage, '#10a37f', 'doctors'], ['Campaign Effectiveness', m.campaignEffectiveness, '#3b82f6', 'campaigns'], ['AI Adoption', m.aiAdoption, '#f5a524', 'ai']]
-          .map(c => `<div class="card" style="text-align:center;cursor:pointer" data-route="${c[3]}"><h3>${c[0]}</h3><div style="margin:10px 0">${donut(c[1], c[2])}</div><div class="muted" style="font-size:12px">View ${c[0].toLowerCase()} ›</div></div>`).join('')}
-      </div>
+        <div class="dbx-split3">
+          <div class="dbx-card"><div class="dbx-card-head"><div><h3>Doctors by Tier</h3><div class="s">${doctors.length} active doctors</div></div><a class="dbx-link" data-route="doctors" href="#doctors">Details</a></div>${pieChart(groupSegments(doctors, d => d.tier || 'Silver', { Platinum: '#7c6bf0', Gold: '#f59e0b', Silver: '#94a3b8' }))}</div>
+          <div class="dbx-card"><div class="dbx-card-head"><div><h3>Division Performance</h3><div class="s">Target achievement % · click a bar</div></div></div>${barChart(divBars)}</div>
+          <div class="dbx-card"><div class="dbx-card-head"><div><h3>Coverage &amp; Adoption</h3><div class="s">Key commercial metrics</div></div></div>
+            <div style="display:flex;flex-direction:column;gap:15px;margin-top:12px">
+              ${[['Doctor Coverage', m.doctorCoverage, '#10b981', 'doctors'], ['Campaign Effectiveness', m.campaignEffectiveness, '#3b82f6', 'campaigns'], ['AI Adoption', m.aiAdoption, '#7c6bf0', 'ai']].map(c => `<div class="between" style="cursor:pointer" data-route="${c[3]}"><span style="font-size:13px;color:var(--ink-2)">${c[0]}</span><div class="flex" style="gap:10px"><div class="bar" style="width:110px"><i style="width:${c[1]}%;background:${c[2]}"></i></div><b style="width:34px;text-align:right">${c[1]}%</b></div></div>`).join('')}
+            </div>
+          </div>
+        </div>
 
-      <div class="section-head mt"><h2 style="font-size:17px">Data Breakdown</h2><span class="pill">${esc(divName)} · click a card to drill in</span></div>
-      <div class="grid cols-3">
-        <div class="card" data-route="doctors" style="cursor:pointer"><h3>Doctors by Tier ›</h3><div class="sub">${doctors.length} doctors</div>${pieChart(groupSegments(doctors, d => d.tier || 'Silver', { Platinum: '#5b6f8a', Gold: '#e0a106', Silver: '#9aa6b2' }))}</div>
-        <div class="card" data-route="visits" style="cursor:pointer"><h3>Visits by Sentiment ›</h3><div class="sub">${visits.length} visits</div>${pieChart(groupSegments(visits, v => v.sentiment, { Positive: '#2ec27e', Neutral: '#9aa6b2', Negative: '#e5484d' }))}</div>
-        <div class="card" data-route="approvals" style="cursor:pointer"><h3>Approvals by Status ›</h3><div class="sub">${s.approvals.length} requests</div>${pieChart(groupSegments(s.approvals, a => a.status, { Pending: '#f5a524', Approved: '#2ec27e', Rejected: '#e5484d', Done: '#10a37f' }))}</div>
-        <div class="card" data-route="inventory" style="cursor:pointer"><h3>Stock by Expiry ›</h3><div class="sub">${(s.stock || []).length} batches</div>${pieChart(stockExpirySegments())}</div>
-        <div class="card" data-route="accounts" style="cursor:pointer"><h3>Expenses by Type ›</h3><div class="sub">${s.expenses.length} claims</div>${pieChart(groupSegments(s.expenses, e => e.type))}</div>
-        <div class="card" data-route="campaigns" style="cursor:pointer"><h3>Campaigns by Status ›</h3><div class="sub">${s.campaigns.length} campaigns</div>${pieChart(groupSegments(s.campaigns, c => c.status, { Active: '#2ec27e', Planned: '#3b82f6', Completed: '#9aa6b2' }))}</div>
-      </div>
+        <div class="between" style="margin:6px 2px 0"><h2 style="font-size:17px;margin:0;font-weight:700">Data Breakdown</h2><span class="pill">${esc(divName)} · click a card to drill in</span></div>
+        <div class="dbx-split3">
+          <div class="dbx-card" data-route="doctors" style="cursor:pointer"><h3>Doctors by Tier ›</h3><div class="s" style="margin-bottom:10px">${doctors.length} doctors</div>${pieChart(groupSegments(doctors, d => d.tier || 'Silver', { Platinum: '#7c6bf0', Gold: '#f59e0b', Silver: '#94a3b8' }))}</div>
+          <div class="dbx-card" data-route="visits" style="cursor:pointer"><h3>Visits by Sentiment ›</h3><div class="s" style="margin-bottom:10px">${visits.length} visits</div>${pieChart(groupSegments(visits, v => v.sentiment, { Positive: '#10b981', Neutral: '#94a3b8', Negative: '#e5484d' }))}</div>
+          <div class="dbx-card" data-route="approvals" style="cursor:pointer"><h3>Approvals by Status ›</h3><div class="s" style="margin-bottom:10px">${s.approvals.length} requests</div>${pieChart(groupSegments(s.approvals, a => a.status, { Pending: '#f59e0b', Approved: '#10b981', Rejected: '#e5484d', Done: '#6d5ae6' }))}</div>
+          <div class="dbx-card" data-route="inventory" style="cursor:pointer"><h3>Stock by Expiry ›</h3><div class="s" style="margin-bottom:10px">${(s.stock || []).length} batches</div>${pieChart(stockExpirySegments())}</div>
+          <div class="dbx-card" data-route="accounts" style="cursor:pointer"><h3>Expenses by Type ›</h3><div class="s" style="margin-bottom:10px">${s.expenses.length} claims</div>${pieChart(groupSegments(s.expenses, e => e.type))}</div>
+          <div class="dbx-card" data-route="campaigns" style="cursor:pointer"><h3>Campaigns by Status ›</h3><div class="s" style="margin-bottom:10px">${s.campaigns.length} campaigns</div>${pieChart(groupSegments(s.campaigns, c => c.status, { Active: '#10b981', Planned: '#3b82f6', Completed: '#94a3b8' }))}</div>
+        </div>
 
-      <div class="grid cols-2 mt">
-        <div class="card">
-          <div class="section-head"><h2 style="font-size:16px">Live Approval Queue</h2><span class="pill">ABM → RBM → Accounts</span></div>
+        <div class="dbx-card">
+          <div class="dbx-card-head"><div><h3>Live Approval Queue</h3><div class="s">ABM → RBM → Accounts</div></div><span class="pill">${pendingAppr.length} pending</span></div>
           ${pendingAppr.length ? approvalsTable(pendingAppr, true) : '<p class="muted">No pending approvals for ' + esc(divName) + '.</p>'}
-        </div>
-        <div class="card">
-          <div class="section-head"><h2 style="font-size:16px">Recent Field Activity</h2><button class="btn ghost sm" data-route="visits">View all</button></div>
-          ${recent.length ? recent.map(v => `<div class="between" style="padding:9px 0;border-bottom:1px solid var(--line);cursor:pointer" data-action="view" data-res="visits" data-id="${v.id}">
-            <span>${v.geoVerified ? '✅' : '⚠️'} <b>${esc(v.type === 'Doctor' ? D.docName(v.targetId) : D.chemName(v.targetId))}</b><br><small class="muted">${esc(D.empName(v.rep))} · ${v.date}</small></span>
-            <span class="badge ${v.sentiment === 'Positive' ? 'ok' : 'muted'}">${v.commitment ? v.commitment + ' u' : v.sentiment}</span>
-          </div>`).join('') : '<p class="muted">No activity for ' + esc(divName) + '.</p>'}
         </div>
       </div>`;
     },

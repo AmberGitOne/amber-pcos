@@ -627,7 +627,7 @@
       <div class="dbx">
         <div class="dbx-hero">
           <div>
-            <h1>Welcome back, ${esc(firstName)} 👋</h1>
+            <h1>Welcome back, ${esc(firstName)}</h1>
             <p>Here's what's happening across ${esc(divName)} — ${periodLabel.toLowerCase()}.</p>
           </div>
           <button class="dbx-btn" data-route="visits">View field activity <span aria-hidden="true">→</span></button>
@@ -639,8 +639,8 @@
             <div class="flex" style="gap:8px;align-items:center"><span class="dbx-tl">Division</span>${divSeg}</div>
           </div>
           <div class="flex" style="gap:8px">
-            <button class="btn ghost sm" data-action="dashRefresh">↻ Refresh</button>
-            <button class="btn ghost sm" data-action="dashExport">⬇ Export CSV</button>
+            <button class="btn ghost sm" data-action="dashRefresh">Refresh</button>
+            <button class="btn ghost sm" data-action="dashExport">Export CSV</button>
           </div>
         </div>
 
@@ -671,7 +671,7 @@
                 const name = v.type === 'Doctor' ? D.docName(v.targetId) : D.chemName(v.targetId);
                 return `<div class="dbx-feed-item" data-action="view" data-res="visits" data-id="${v.id}">
                   ${dbxAvatar(D.empName(v.rep), i)}
-                  <div class="dbx-feed-txt"><b>${esc(D.empName(v.rep))}</b> ${v.type === 'Doctor' ? 'visited' : 'called on'} <span class="lk">${esc(name)}</span>${v.commitment ? ` · <b>${v.commitment}</b> units` : ''}<div class="t">${v.geoVerified ? '✓ geo-verified' : '⚠ unverified'} · ${dbxAgo(v.date)}</div></div>
+                  <div class="dbx-feed-txt"><b>${esc(D.empName(v.rep))}</b> ${v.type === 'Doctor' ? 'visited' : 'called on'} <span class="lk">${esc(name)}</span>${v.commitment ? ` · <b>${v.commitment}</b> units` : ''}<div class="t">${v.geoVerified ? '<span class="dbx-dot ok"></span>Geo-verified' : '<span class="dbx-dot bad"></span>Unverified'} · ${dbxAgo(v.date)}</div></div>
                 </div>`;
               }).join('') : '<p class="muted">No activity for ' + esc(divName) + '.</p>'}
             </div>
@@ -690,12 +690,12 @@
 
         <div class="between" style="margin:6px 2px 0"><h2 style="font-size:17px;margin:0;font-weight:700">Data Breakdown</h2><span class="pill">${esc(divName)} · click a card to drill in</span></div>
         <div class="dbx-split3">
-          <div class="dbx-card" data-route="doctors" style="cursor:pointer"><h3>Doctors by Tier ›</h3><div class="s" style="margin-bottom:10px">${doctors.length} doctors</div>${pieChart(groupSegments(doctors, d => d.tier || 'Silver', { Platinum: '#7c6bf0', Gold: '#f59e0b', Silver: '#94a3b8' }))}</div>
-          <div class="dbx-card" data-route="visits" style="cursor:pointer"><h3>Visits by Sentiment ›</h3><div class="s" style="margin-bottom:10px">${visits.length} visits</div>${pieChart(groupSegments(visits, v => v.sentiment, { Positive: '#10b981', Neutral: '#94a3b8', Negative: '#e5484d' }))}</div>
-          <div class="dbx-card" data-route="approvals" style="cursor:pointer"><h3>Approvals by Status ›</h3><div class="s" style="margin-bottom:10px">${s.approvals.length} requests</div>${pieChart(groupSegments(s.approvals, a => a.status, { Pending: '#f59e0b', Approved: '#10b981', Rejected: '#e5484d', Done: '#6d5ae6' }))}</div>
-          <div class="dbx-card" data-route="inventory" style="cursor:pointer"><h3>Stock by Expiry ›</h3><div class="s" style="margin-bottom:10px">${(s.stock || []).length} batches</div>${pieChart(stockExpirySegments())}</div>
-          <div class="dbx-card" data-route="accounts" style="cursor:pointer"><h3>Expenses by Type ›</h3><div class="s" style="margin-bottom:10px">${s.expenses.length} claims</div>${pieChart(groupSegments(s.expenses, e => e.type))}</div>
-          <div class="dbx-card" data-route="campaigns" style="cursor:pointer"><h3>Campaigns by Status ›</h3><div class="s" style="margin-bottom:10px">${s.campaigns.length} campaigns</div>${pieChart(groupSegments(s.campaigns, c => c.status, { Active: '#10b981', Planned: '#3b82f6', Completed: '#94a3b8' }))}</div>
+          <div class="dbx-card" data-route="doctors" style="cursor:pointer"><h3>Doctors by Tier</h3><div class="s" style="margin-bottom:10px">${doctors.length} doctors</div>${pieChart(groupSegments(doctors, d => d.tier || 'Silver', { Platinum: '#7c6bf0', Gold: '#f59e0b', Silver: '#94a3b8' }))}</div>
+          <div class="dbx-card" data-route="visits" style="cursor:pointer"><h3>Visits by Sentiment</h3><div class="s" style="margin-bottom:10px">${visits.length} visits</div>${pieChart(groupSegments(visits, v => v.sentiment, { Positive: '#10b981', Neutral: '#94a3b8', Negative: '#e5484d' }))}</div>
+          <div class="dbx-card" data-route="approvals" style="cursor:pointer"><h3>Approvals by Status</h3><div class="s" style="margin-bottom:10px">${s.approvals.length} requests</div>${pieChart(groupSegments(s.approvals, a => a.status, { Pending: '#f59e0b', Approved: '#10b981', Rejected: '#e5484d', Done: '#6d5ae6' }))}</div>
+          <div class="dbx-card" data-route="inventory" style="cursor:pointer"><h3>Stock by Expiry</h3><div class="s" style="margin-bottom:10px">${(s.stock || []).length} batches</div>${pieChart(stockExpirySegments())}</div>
+          <div class="dbx-card" data-route="accounts" style="cursor:pointer"><h3>Expenses by Type</h3><div class="s" style="margin-bottom:10px">${s.expenses.length} claims</div>${pieChart(groupSegments(s.expenses, e => e.type))}</div>
+          <div class="dbx-card" data-route="campaigns" style="cursor:pointer"><h3>Campaigns by Status</h3><div class="s" style="margin-bottom:10px">${s.campaigns.length} campaigns</div>${pieChart(groupSegments(s.campaigns, c => c.status, { Active: '#10b981', Planned: '#3b82f6', Completed: '#94a3b8' }))}</div>
         </div>
 
         <div class="dbx-card">

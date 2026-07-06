@@ -171,6 +171,32 @@ try { db.exec(`ALTER TABLE users ADD COLUMN target_chemists INTEGER DEFAULT 5`);
 // ---- migration: editable base monthly salary (admin) ----------------------
 try { db.exec(`ALTER TABLE users ADD COLUMN salary REAL`); } catch (e) { /* exists */ }
 
+// ---- migration: phone numbers (for SMS notifications) ---------------------
+for (const t of ['chemists', 'distributors', 'users']) {
+  try { db.exec(`ALTER TABLE ${t} ADD COLUMN phone TEXT`); } catch (e) { /* exists */ }
+}
+// SMS outbox — every triggered message is recorded here (real send when a
+// gateway is configured via env, otherwise 'simulated'). UNIQUE(ref,trigger)
+// gives idempotent triggering: the same achievement never texts twice.
+db.exec(`
+CREATE TABLE IF NOT EXISTS sms_outbox (
+  id TEXT PRIMARY KEY, org_id TEXT, ref TEXT, trigger TEXT, to_phone TEXT,
+  name TEXT, message TEXT, status TEXT, provider TEXT, created_at TEXT,
+  UNIQUE(org_id, ref, trigger)
+);
+CREATE INDEX IF NOT EXISTS idx_sms_org ON sms_outbox(org_id);`);
+// demo placeholder phone numbers so the SMS trigger is visible out of the box
+// (seed data only — clearly fake; real contacts get numbers via their edit form)
+(function backfillDemoPhones() {
+  const setId = (tbl, id, phone) => { try { db.prepare(`UPDATE ${tbl} SET phone=? WHERE id=? AND (phone IS NULL OR phone='')`).run(phone, id); } catch (e) {} };
+  const map = { C1: '+91 98200 11001', C2: '+91 98200 11002', C3: '+91 98200 11003', DS1: '+91 98200 22001', DS2: '+91 98200 22002' };
+  for (const [id, ph] of Object.entries(map)) setId(id.startsWith('DS') ? 'distributors' : 'chemists', id, ph);
+  try {
+    db.prepare("SELECT id FROM users WHERE phone IS NULL OR phone=''").all()
+      .forEach((u, i) => db.prepare('UPDATE users SET phone=? WHERE id=?').run('+91 99000 ' + String(30001 + i), u.id));
+  } catch (e) {}
+})();
+
 // ---- seed (runs once) -----------------------------------------------------
 function seed() {
   const already = db.prepare('SELECT COUNT(*) c FROM orgs').get();

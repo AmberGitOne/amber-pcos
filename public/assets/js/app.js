@@ -162,7 +162,7 @@
     const max = Math.max(1, ...data.flatMap(d => keys.map(k => d[k]))) * 1.18;
     const X = i => data.length === 1 ? w / 2 : padL + i * (w - padL - padR) / (data.length - 1);
     const Y = v => padT + (1 - v / max) * (h - padT - padB);
-    const COL = { primary: '#6d5ae6', secondary: '#f59e0b' };
+    const COL = { primary: '#1f5aff', secondary: '#f59e0b' };
     const grid = [0, .25, .5, .75, 1].map(t => {
       const y = padT + t * (h - padT - padB), val = Math.round(max * (1 - t));
       return `<line x1="${padL}" x2="${w - padR}" y1="${y.toFixed(1)}" y2="${y.toFixed(1)}" stroke="#eef1f5"/><text x="${padL - 8}" y="${(y + 3).toFixed(1)}" font-size="10" fill="#94a3b8" text-anchor="end">${val}</text>`;
@@ -188,11 +188,25 @@
     approvals: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
   };
   function dbxDelta(txt, dir) { return `<span class="dbx-delta ${dir}">${dir === 'up' ? '▲' : dir === 'down' ? '▼' : '•'} ${esc(txt)}</span>`; }
-  const DBX_AV = ['#6d5ae6', '#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#0891b2', '#8b5cf6'];
+  const DBX_AV = ['#1f5aff', '#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#0891b2', '#8b5cf6'];
   function dbxAvatar(name, i) {
     const n = (name || '?').trim();
     const init = (n.split(/\s+/).map(w => w[0]).join('').slice(0, 2) || '?').toUpperCase();
     return `<div class="dbx-av" style="background:${DBX_AV[i % DBX_AV.length]}">${esc(init)}</div>`;
+  }
+  // deterministic colour from a name (stable per person across the app)
+  function avColor(name) {
+    const n = (name || '?').trim();
+    let h = 0; for (let i = 0; i < n.length; i++) h = (h * 31 + n.charCodeAt(i)) >>> 0;
+    return DBX_AV[h % DBX_AV.length];
+  }
+  // avatar chip + name, matching the dashboard "Recent Activity" style — used in
+  // every module list so doctors and salespeople look the same everywhere
+  function nameAv(name) {
+    const n = (name || '?').trim();
+    const base = n.replace(/^(Dr\.?|Mr\.?|Mrs\.?|Ms\.?)\s+/i, '');
+    const init = (base.split(/\s+/).map(w => w[0]).join('').replace(/[^A-Za-z0-9]/g, '').slice(0, 2) || n[0] || '?').toUpperCase();
+    return `<span class="name-av"><span class="av-dot" style="background:${avColor(n)}">${esc(init)}</span><b>${esc(name)}</b></span>`;
   }
   function dbxAgo(dateStr) {
     const days = Math.round((new Date(today()) - new Date(dateStr)) / 86400000);
@@ -364,11 +378,11 @@
   function bellHtml() {
     const A = computeAlerts();
     return `<div class="bell">
-      <button class="iconbtn" data-action="toggleAlerts" title="Notifications">🔔${A.length ? `<span class="bell-badge">${A.length}</span>` : ''}</button>
+      <button class="iconbtn" data-action="toggleAlerts" title="Notifications">${UI_ICONS.bell}${A.length ? `<span class="bell-badge">${A.length}</span>` : ''}</button>
       <div id="alerts-panel" class="alerts-panel hidden">
         <div class="alerts-head">Alerts <span class="muted">${A.length}</span></div>
-        ${A.length ? A.map(a => `<div class="alert-row" data-route="${a.route}"><span class="dot ${a.sev}"></span><span class="ic">${a.icon}</span><span>${esc(a.text)}</span></div>`).join('')
-          : '<div class="alert-row"><span class="muted">All clear — nothing needs attention 🎉</span></div>'}
+        ${A.length ? A.map(a => `<div class="alert-row" data-route="${a.route}"><span class="dot ${a.sev}"></span><span>${esc(a.text)}</span></div>`).join('')
+          : '<div class="alert-row"><span class="muted">All clear — nothing needs attention.</span></div>'}
       </div></div>`;
   }
 
@@ -378,10 +392,58 @@
     return `<span class="badge ${m[s] || 'muted'}">${s}</span>`;
   }
 
+  // ---- brand logo: scattered dot-ring in blue + purple -------------------
+  function logoSvg(size = 34) {
+    const c = size / 2, R = size * 0.42, BLUE = '#1f5aff', PUR = '#a31fe6';
+    let dots = '';
+    const N = 26;
+    for (let i = 0; i < N; i++) {
+      const ang = -Math.PI / 2 + 0.55 + (i / N) * (2 * Math.PI - 1.1); // open at bottom
+      const rr = R * (0.80 + ((i * 7) % 5) * 0.05);
+      const x = c + rr * Math.cos(ang), y = c + rr * Math.sin(ang);
+      const rad = size * (0.028 + ((i * 3) % 4) * 0.012);
+      dots += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${rad.toFixed(1)}" fill="${(i % 5 === 0 || i % 7 === 0) ? PUR : BLUE}"/>`;
+    }
+    return `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">${dots}<circle cx="${c}" cy="${c}" r="${(size * 0.16).toFixed(1)}" fill="${BLUE}"/></svg>`;
+  }
+  // Uses the real logo image if present at assets/img/amber-logo.png; if the
+  // file is missing the <img> removes itself and the SVG fallback shows.
+  const LOGO_MARK = `<span class="brand-logo"><img class="logo-img" src="assets/img/amber-logo.png" alt="Amber LifeSciences" onerror="this.remove()">${logoSvg(36)}</span>`;
+
+  // Knock out the logo's flat light background so it blends on any surface.
+  // Same-origin image → canvas pixels are readable. Near-white / low-saturation
+  // pixels become transparent; the coloured dots are kept.
+  function knockoutLogoBg(img) {
+    const w = img.naturalWidth, h = img.naturalHeight;
+    const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+    const ctx = cv.getContext('2d'); ctx.drawImage(img, 0, 0);
+    const d = ctx.getImageData(0, 0, w, h), p = d.data;
+    for (let i = 0; i < p.length; i += 4) {
+      const r = p[i], g = p[i + 1], b = p[i + 2];
+      const mx = Math.max(r, g, b), sat = mx - Math.min(r, g, b);
+      if (mx > 225 && sat < 22) p[i + 3] = 0;                       // flat light bg → clear
+      else if (mx > 205 && sat < 34) p[i + 3] = Math.round(p[i + 3] * (sat / 34)); // feather edges
+    }
+    ctx.putImageData(d, 0, 0);
+    return cv;
+  }
+  function mountLogos() {
+    document.querySelectorAll('.brand-logo img').forEach(img => {
+      if (img.dataset.proc) return;
+      const go = () => {
+        if (img.dataset.proc) return; img.dataset.proc = '1';
+        try { const cv = knockoutLogoBg(img); cv.className = 'logo-cv'; img.parentNode.insertBefore(cv, img); img.style.display = 'none'; } catch (e) {}
+      };
+      if (img.complete && img.naturalWidth) go();
+      else img.addEventListener('load', go, { once: true });
+    });
+  }
+
   // ---- navigation ---------------------------------------------------------
   // clean line-icons (Feather-style) keyed by route — replaces emoji glyphs
   const _si = (p) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
   const NAV_ICONS = {
+    today: _si('<rect x="3" y="4" width="18" height="17" rx="2.5"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="9.5" x2="21" y2="9.5"/><path d="m8.5 15 2 2 4-4"/>'),
     dashboard: _si('<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/>'),
     planner: _si('<path d="M9 4H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2"/><rect x="9" y="2.5" width="6" height="4" rx="1"/><path d="m9 14 2 2 4-4"/>'),
     ai: _si('<path d="M12 3l1.8 4.4L18 9l-4.2 1.6L12 15l-1.8-4.4L6 9l4.2-1.6z"/><path d="M18.5 14.5l.8 1.9 1.9.8-1.9.8-.8 1.9-.8-1.9-1.9-.8 1.9-.8z"/>'),
@@ -406,9 +468,40 @@
     products: _si('<path d="M9 3h6"/><path d="M10 3v5.5L5.5 17A2 2 0 0 0 7.3 20h9.4a2 2 0 0 0 1.8-3L14 8.5V3"/><line x1="8" y1="14.5" x2="16" y2="14.5"/>'),
     team: _si('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>'),
     settings: _si('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/>'),
+    account: _si('<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>'),
   };
+  // topbar / chrome UI icons
+  const UI_ICONS = {
+    menu: _si('<line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>'),
+    close: _si('<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>'),
+    search: _si('<circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>'),
+    bell: _si('<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>'),
+    phone: _si('<rect x="7" y="2" width="10" height="20" rx="2.5"/><line x1="11" y1="18" x2="13" y2="18"/>'),
+    monitor: _si('<rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>'),
+    plus: _si('<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>'),
+    chevron: _si('<polyline points="9 6 15 12 9 18"/>'),
+  };
+  // bottom-tab icons for the mobile TSM "Today" screen
+  const TAB_ICONS = {
+    today: _si('<rect x="3" y="4" width="18" height="17" rx="2.5"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="9.5" x2="21" y2="9.5"/>'),
+    doctors: _si('<path d="M6 3v6a6 6 0 0 0 12 0V3"/><line x1="6" y1="3" x2="4" y2="3"/><line x1="18" y1="3" x2="20" y2="3"/><circle cx="20" cy="15" r="2.5"/><path d="M12 15v1a5 5 0 0 0 5 5"/>'),
+    mic: _si('<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><line x1="12" y1="18" x2="12" y2="22"/>'),
+    ticket: _si('<path d="M3 9a2 2 0 0 1 0 6v2a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2a2 2 0 0 1 0-6V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2z"/><line x1="12" y1="7" x2="12" y2="17" stroke-dasharray="1.5 2"/>'),
+    chat: _si('<path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.5 8.5 8.5 0 0 1-3.6-.8L3 21l1.9-5.4A8.5 8.5 0 1 1 21 11.5z"/>'),
+  };
+  // section icons for the collapsible sidebar groups
+  const GROUP_ICONS = {
+    Overview: _si('<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/>'),
+    Relationships: _si('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>'),
+    'Field Force': _si('<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="2.8"/>'),
+    Commercial: _si('<rect x="2.5" y="7.5" width="19" height="13" rx="2"/><path d="M16 20.5V5.5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v15"/>'),
+    Admin: _si('<path d="M12 2 4 5v6c0 5 3.5 8.6 8 10 4.5-1.4 8-5 8-10V5l-8-3z"/><path d="m9 12 2 2 4-4"/>'),
+    Account: _si('<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>'),
+  };
+  let navOpen = {}; // per-section expand state for the accordion sidebar
   const NAV = [
     { group: 'Overview', items: [
+      ['today', '📅', 'Today'],
       ['dashboard', '📊', 'Executive Dashboard'],
       ['planner', '✅', 'Daily Planner (AI)'],
       ['ai', '🤖', 'AI Sales Copilot'],
@@ -442,14 +535,85 @@
       ['team', '👥', 'Team & Hierarchy'],
       ['settings', '⚙️', 'Settings & Tenant'],
     ]},
+    { group: 'Account', items: [
+      ['account', '👤', 'My Account'],
+    ]},
   ];
   const TITLES = Object.fromEntries(NAV.flatMap(g => g.items.map(i => [i[0], i[2]])));
+
+  // per-page hero banners — every module leads with the same headline band as the
+  // executive dashboard [headline, subtitle]
+  const HERO = {
+    planner: ['Your day, planned', 'AI-built call list from RCPA gaps, visit frequency and commitments.'],
+    ai: ['AI Sales Copilot', 'Ask, summarise and get next-best-actions across your territory.'],
+    doctors: ['Doctor Relationships', 'Profile, tier and engage your prescriber base.'],
+    chemists: ['Chemist Network', 'Coverage, tiers and stock across your retail partners.'],
+    distributors: ['Distributor Network', 'Stockists, lead times and secondary reach.'],
+    visits: ['Field Visits & SFA', 'Geo-verified check-ins, RCPA and doctor commitments.'],
+    targets: ['Targets & Coverage', 'Rep goals, coverage and incentive tracking.'],
+    rcpa: ['RCPA Engine', 'Prescription audit and competitive Rx-share analysis.'],
+    gps: ['GPS & Field Tracking', 'Live location, routes and mock-location flags.'],
+    campaigns: ['PMT / CLM Campaigns', 'Plan, run and measure closed-loop marketing.'],
+    edetailing: ['E-Detailing', 'Interactive visual-aid decks and engagement analytics.'],
+    distribution: ['Distribution Engine', 'Primary-to-secondary flow, pricing and reconciliation.'],
+    orders: ['Orders & Secondary Sales', 'Order booking, fulfilment and secondary sales.'],
+    inventory: ['Stock & Expiry', 'Batch stock, expiry risk and replenishment.'],
+    schemes: ['Trade Schemes & Perks', 'Partner targets, achievement and incentive payouts.'],
+    gifting: ['Gifting & Celebrations', 'Compliant, occasion-based partner engagement.'],
+    approvals: ['Approval Workflow', 'Budget and activity approvals across the hierarchy.'],
+    accounts: ['Samples, Spend & Accounts', 'Samples, expenses and budget control.'],
+    reports: ['Reports & Exports', 'Download operational and commercial reports.'],
+    hr: ['HR & Payroll', 'Attendance, leave and incentive payroll.'],
+    products: ['Products — SKU Master', 'SKU master, pricing and divisions.'],
+    team: ['Team & Hierarchy', 'Users, roles and reporting structure.'],
+    settings: ['Settings & Tenant', 'Organisation and tenant configuration.'],
+    account: ['My Account', 'View and update your personal details and password.'],
+  };
+  function pageHero(route) {
+    const h = HERO[route];
+    if (!h) return '';
+    return `<div class="dbx-hero page-hero"><div><h1>${esc(h[0])}</h1><p>${esc(h[1])}</p></div></div>`;
+  }
+
   // role-restricted pages (omitted = visible to everyone). Employee target/incentive
   // tracking is management-only.
+  // role-based navigation — each job sees only the modules relevant to it.
+  // Admin sees everything (special-cased below). Routes not listed here (e.g.
+  // dashboard) are visible to every signed-in role.
   const PAGE_ACCESS = {
-    targets: ['Admin', 'Accounts', 'RBM', 'Business Head'],
+    dashboard:    ['ABM', 'RBM', 'Accounts', 'PMT', 'Business Head'], // exec analytics — not for a single rep
+    planner:      ['TSM', 'ABM', 'RBM', 'Business Head'],
+    ai:           ['TSM', 'ABM', 'RBM', 'PMT', 'Accounts', 'Business Head'],
+    doctors:      ['TSM', 'ABM', 'RBM', 'PMT', 'Business Head'],
+    chemists:     ['TSM', 'ABM', 'RBM', 'Business Head'],
+    distributors: ['TSM', 'ABM', 'RBM', 'Accounts', 'Business Head'],
+    visits:       ['TSM', 'ABM', 'RBM', 'Business Head'],
+    targets:      ['RBM', 'Accounts', 'Business Head'],
+    rcpa:         ['TSM', 'ABM', 'RBM', 'PMT', 'Business Head'],
+    gps:          ['TSM', 'ABM', 'RBM', 'Business Head'],
+    campaigns:    ['PMT', 'RBM', 'Business Head'],
+    edetailing:   ['PMT', 'TSM', 'ABM', 'RBM', 'Business Head'],
+    distribution: ['Accounts', 'RBM', 'Business Head'],
+    orders:       ['TSM', 'ABM', 'RBM', 'Accounts', 'Business Head'],
+    inventory:    ['TSM', 'ABM', 'RBM', 'Accounts', 'Business Head'],
+    schemes:      ['ABM', 'RBM', 'Accounts', 'Business Head'],
+    gifting:      ['TSM', 'ABM', 'RBM', 'Business Head'],
+    approvals:    ['TSM', 'ABM', 'RBM', 'Accounts', 'Business Head'],
+    accounts:     ['TSM', 'ABM', 'RBM', 'Accounts', 'Business Head'],
+    reports:      ['RBM', 'PMT', 'Accounts', 'Business Head'],
+    hr:           ['Accounts', 'Business Head'],
+    products:     ['PMT', 'Business Head'],
+    team:         ['RBM', 'Business Head'],
+    settings:     [],
   };
-  const canAccess = (route) => !PAGE_ACCESS[route] || PAGE_ACCESS[route].includes((D.user() || {}).role);
+  const canAccess = (route) => {
+    const role = (D.user() || {}).role;
+    if (role === 'Admin') return true;
+    const allow = PAGE_ACCESS[route];
+    return !allow || allow.includes(role);
+  };
+  // field reps land on the "Today" home; managers on the executive dashboard
+  const homeRoute = () => ['TSM', 'ABM'].includes((D.user() || {}).role) ? 'today' : 'dashboard';
 
   // ---- AUTH (portals · role login · signup) ------------------------------
   let authScreen = 'landing', authRole = null;
@@ -485,7 +649,7 @@
       <div class="auth-shell">
         <div class="auth-aside">
           <div class="auth-aside-in">
-            <div class="logo lg"><span class="mark">A</span> Amber LifeSciences</div>
+            <div class="logo lg">${LOGO_MARK} Amber LifeSciences</div>
             <h1>Pharma Commercial Operating System</h1>
             <p>Field-force automation, RCPA, distribution, approvals and an AI sales copilot — one platform for the entire commercial engine.</p>
             <ul class="auth-feat">
@@ -509,6 +673,7 @@
     document.querySelectorAll('[data-pwtoggle]').forEach(b => {
       b.onclick = () => { const i = $('#' + b.dataset.pwtoggle); if (!i) return; const show = i.type === 'password'; i.type = show ? 'text' : 'password'; b.textContent = show ? 'Hide' : 'Show'; };
     });
+    mountLogos();
   }
 
   function renderAuth() {
@@ -520,7 +685,7 @@
 
   function renderLanding() {
     document.body.innerHTML = authShell(`
-      <div class="logo mob-only"><span class="mark">A</span> Amber LifeSciences</div>
+      <div class="logo mob-only">${LOGO_MARK} Amber LifeSciences</div>
       <h2>Welcome back</h2>
       <p class="tag">Select your designation to sign in</p>
       <div class="portal-grid">
@@ -552,7 +717,7 @@
       const btn = $('#lg-go'); btn.textContent = 'Signing in…'; btn.disabled = true;
       try {
         session = await D.login($('#lg-email').value.trim(), $('#lg-pass').value, role);
-        location.hash = '#dashboard'; route();
+        location.hash = '#' + homeRoute(); route();
       } catch (e) { renderRoleLogin(role, e.message); }
     };
     $('#lg-go').onclick = go;
@@ -565,7 +730,7 @@
     const roles = ROLE_PORTALS.filter(p => p.role !== 'Admin');
     document.body.innerHTML = authShell(`
       <a class="back" data-auth="landing">‹ Back to portals</a>
-      <div class="logo mob-only"><span class="mark">A</span> Amber LifeSciences</div>
+      <div class="logo mob-only">${LOGO_MARK} Amber LifeSciences</div>
       <h2>Create your account</h2><p class="tag">Self-register to join the Amber commercial platform</p>
       <div class="field"><label>Full name</label><input id="su-name" value="${esc(v.name || '')}"></div>
       <div class="field"><label>Work email</label><input id="su-email" type="email" placeholder="name@company.com" value="${esc(v.email || '')}"></div>
@@ -591,7 +756,7 @@
       const btn = $('#su-go'); btn.textContent = 'Creating account…'; btn.disabled = true;
       try {
         session = await D.signup({ name, email, password: pass, role, division: div });
-        location.hash = '#dashboard'; route();
+        location.hash = '#' + homeRoute(); route();
       } catch (e) { renderSignup(e.message, keep); }
     };
     bindAuthLinks();
@@ -604,34 +769,66 @@
       <div class="app">
         <div class="nav-backdrop" data-action="closeNav"></div>
         <aside class="sidebar">
-          <div class="logo"><span class="mark">A</span> Amber <button class="iconbtn drawer-x" data-action="closeNav" title="Close">✕</button></div>
+          <div class="logo">${LOGO_MARK}<span class="logo-txt">Amber<small>Pharma Commercial OS</small></span><button class="iconbtn drawer-x" data-action="closeNav" title="Close">${UI_ICONS.close}</button></div>
           <nav class="nav">
-            ${NAV.map(g => { const items = g.items.filter(i => canAccess(i[0])); return items.length ? `<div class="nav-group">${g.group}</div>` +
-              items.map(i => `<a href="#${i[0]}" data-route="${i[0]}" class="${i[0] === route ? 'active' : ''}"><span class="ic">${NAV_ICONS[i[0]] || i[1]}</span>${i[2]}</a>`).join('') : ''; }).join('')}
+            ${NAV.map(g => {
+              const items = g.items.filter(i => canAccess(i[0]));
+              if (!items.length) return '';
+              const hasActive = items.some(i => i[0] === route);
+              const open = (g.group in navOpen) ? navOpen[g.group] : hasActive;
+              return `<div class="nav-sec ${open ? 'open' : ''}" data-navsec="${esc(g.group)}">
+                <button class="nav-head" data-action="toggleSec" data-sec="${esc(g.group)}">
+                  <span class="ic">${GROUP_ICONS[g.group] || ''}</span>
+                  <span class="nav-head-label">${g.group}</span>
+                  <span class="nav-chev">${UI_ICONS.chevron}</span>
+                </button>
+                <div class="nav-items">
+                  ${items.map(i => `<a href="#${i[0]}" data-route="${i[0]}" class="${i[0] === route ? 'active' : ''}">${i[2]}</a>`).join('')}
+                </div>
+              </div>`;
+            }).join('')}
           </nav>
         </aside>
         <header class="topbar">
-          <button class="iconbtn menu-btn" data-action="toggleNav" title="Menu">☰</button>
-          <div>
-            <div class="crumb">Amber LifeSciences › ${esc(D.divName(session.division))}</div>
+          <button class="iconbtn menu-btn" data-action="toggleNav" title="Menu">${UI_ICONS.menu}</button>
+          <div class="tb-title">
+            <div class="crumb">${esc(D.divName(session.division))}</div>
             <h2 id="page-title">${TITLES[route] || ''}</h2>
           </div>
-          <div class="spacer"></div>
-          <button class="iconbtn viewbtn" data-action="toggleView" title="Switch desktop / phone view"><span class="vb-phone">📱</span><span class="vb-desk">🖥️</span></button>
-          ${bellHtml()}
-          <button class="btn ghost sm logvisit-btn" data-action="newVisit"><span class="lv-full">＋ Log Visit</span><span class="lv-short">＋</span></button>
-          <div class="who">
-            <div class="meta right"><b>${esc(session.name)}</b><br><span>${esc(session.role)}</span></div>
-            <div class="avatar">${esc(session.name[0])}</div>
-            <button class="btn ghost sm logout-btn" data-action="logout">Logout</button>
+          <div class="tb-search"><div class="box">${UI_ICONS.search}<input id="global-search" type="text" placeholder="Search modules…" autocomplete="off"></div></div>
+          <div class="tb-actions">
+            <button class="iconbtn viewbtn" data-action="toggleView" title="Switch desktop / phone view"><span class="vb-phone">${UI_ICONS.phone}</span><span class="vb-desk">${UI_ICONS.monitor}</span></button>
+            ${bellHtml()}
+            <button class="btn ghost sm logvisit-btn" data-action="newVisit"><span class="lv-full">Log Visit</span><span class="lv-short">${UI_ICONS.plus}</span></button>
+            <div class="who">
+              <div class="meta right"><b>${esc(session.name)}</b><br><span>${esc(session.role)}</span></div>
+              <div class="avatar">${esc(session.name[0])}</div>
+              <button class="btn ghost sm logout-btn" data-action="logout">Logout</button>
+            </div>
           </div>
         </header>
         <main class="main" id="main"></main>
       </div>`;
     if (liveWatch != null) { try { navigator.geolocation.clearWatch(liveWatch); } catch (e) {} liveWatch = null; }
-    $('#main').innerHTML = (VIEWS[route] || VIEWS.dashboard)();
+    const view = (VIEWS[route] || VIEWS.dashboard)();
+    $('#main').innerHTML = (route !== 'dashboard' ? pageHero(route) : '') + view;
     bindRoute();
+    bindGlobalSearch();
+    mountLogos();
     if (AFTER[route]) AFTER[route]();
+  }
+
+  // topbar search — Enter jumps to the first matching (accessible) module
+  function bindGlobalSearch() {
+    const inp = document.getElementById('global-search');
+    if (!inp) return;
+    inp.addEventListener('keydown', e => {
+      if (e.key !== 'Enter') return;
+      const q = inp.value.trim().toLowerCase();
+      if (!q) return;
+      const hit = NAV.flatMap(g => g.items).find(i => canAccess(i[0]) && (i[2].toLowerCase().includes(q) || i[0].includes(q)));
+      if (hit) { location.hash = hit[0]; inp.blur(); } else { toast('No module matches “' + inp.value.trim() + '”'); }
+    });
   }
 
   function bindRoute() {
@@ -677,7 +874,7 @@
 
       const divBars = s.divisions.map((d, i) => ({
         label: d.name.split(' ')[0], val: [68, 54, 41, 47][i],
-        color: ['#6d5ae6', '#3b82f6', '#10b981', '#f59e0b'][i % 4],
+        color: ['#1f5aff', '#3b82f6', '#10b981', '#f59e0b'][i % 4],
         action: 'dashDiv', div: d.id, tip: d.name + ' — ' + [68, 54, 41, 47][i] + '% of target', active: st.division === d.id,
       }));
 
@@ -722,7 +919,7 @@
               ${seriesSeg}
             </div>
             ${areaChart(trend, 640, 250, st.series)}
-            <div class="legend" style="margin-top:4px">${st.series !== 'secondary' ? '<span><i style="background:#6d5ae6"></i>Primary</span>' : ''}${st.series !== 'primary' ? '<span><i style="background:#f59e0b"></i>Secondary</span>' : ''}</div>
+            <div class="legend" style="margin-top:4px">${st.series !== 'secondary' ? '<span><i style="background:#1f5aff"></i>Primary</span>' : ''}${st.series !== 'primary' ? '<span><i style="background:#f59e0b"></i>Secondary</span>' : ''}</div>
           </div>
           <div class="dbx-card">
             <div class="dbx-card-head"><div><h3>Recent Activity</h3><div class="s">Latest field check-ins</div></div><a class="dbx-link" data-route="visits" href="#visits">View all</a></div>
@@ -739,20 +936,20 @@
         </div>
 
         <div class="dbx-split3">
-          <div class="dbx-card"><div class="dbx-card-head"><div><h3>Doctors by Tier</h3><div class="s">${doctors.length} active doctors</div></div><a class="dbx-link" data-route="doctors" href="#doctors">Details</a></div>${pieChart(groupSegments(doctors, d => d.tier || 'Silver', { Platinum: '#7c6bf0', Gold: '#f59e0b', Silver: '#94a3b8' }))}</div>
+          <div class="dbx-card"><div class="dbx-card-head"><div><h3>Doctors by Tier</h3><div class="s">${doctors.length} active doctors</div></div><a class="dbx-link" data-route="doctors" href="#doctors">Details</a></div>${pieChart(groupSegments(doctors, d => d.tier || 'Silver', { Platinum: '#6d94ff', Gold: '#f59e0b', Silver: '#94a3b8' }))}</div>
           <div class="dbx-card"><div class="dbx-card-head"><div><h3>Division Performance</h3><div class="s">Target achievement % · click a bar</div></div></div>${barChart(divBars)}</div>
           <div class="dbx-card"><div class="dbx-card-head"><div><h3>Coverage &amp; Adoption</h3><div class="s">Key commercial metrics</div></div></div>
             <div style="display:flex;flex-direction:column;gap:15px;margin-top:12px">
-              ${[['Doctor Coverage', m.doctorCoverage, '#10b981', 'doctors'], ['Campaign Effectiveness', m.campaignEffectiveness, '#3b82f6', 'campaigns'], ['AI Adoption', m.aiAdoption, '#7c6bf0', 'ai']].map(c => `<div class="between" style="cursor:pointer" data-route="${c[3]}"><span style="font-size:13px;color:var(--ink-2)">${c[0]}</span><div class="flex" style="gap:10px"><div class="bar" style="width:110px"><i style="width:${c[1]}%;background:${c[2]}"></i></div><b style="width:34px;text-align:right">${c[1]}%</b></div></div>`).join('')}
+              ${[['Doctor Coverage', m.doctorCoverage, '#10b981', 'doctors'], ['Campaign Effectiveness', m.campaignEffectiveness, '#3b82f6', 'campaigns'], ['AI Adoption', m.aiAdoption, '#6d94ff', 'ai']].map(c => `<div class="between" style="cursor:pointer" data-route="${c[3]}"><span style="font-size:13px;color:var(--ink-2)">${c[0]}</span><div class="flex" style="gap:10px"><div class="bar" style="width:110px"><i style="width:${c[1]}%;background:${c[2]}"></i></div><b style="width:34px;text-align:right">${c[1]}%</b></div></div>`).join('')}
             </div>
           </div>
         </div>
 
         <div class="between" style="margin:6px 2px 0"><h2 style="font-size:17px;margin:0;font-weight:700">Data Breakdown</h2><span class="pill">${esc(divName)} · click a card to drill in</span></div>
         <div class="dbx-split3">
-          <div class="dbx-card" data-route="doctors" style="cursor:pointer"><h3>Doctors by Tier</h3><div class="s" style="margin-bottom:10px">${doctors.length} doctors</div>${pieChart(groupSegments(doctors, d => d.tier || 'Silver', { Platinum: '#7c6bf0', Gold: '#f59e0b', Silver: '#94a3b8' }))}</div>
+          <div class="dbx-card" data-route="doctors" style="cursor:pointer"><h3>Doctors by Tier</h3><div class="s" style="margin-bottom:10px">${doctors.length} doctors</div>${pieChart(groupSegments(doctors, d => d.tier || 'Silver', { Platinum: '#6d94ff', Gold: '#f59e0b', Silver: '#94a3b8' }))}</div>
           <div class="dbx-card" data-route="visits" style="cursor:pointer"><h3>Visits by Sentiment</h3><div class="s" style="margin-bottom:10px">${visits.length} visits</div>${pieChart(groupSegments(visits, v => v.sentiment, { Positive: '#10b981', Neutral: '#94a3b8', Negative: '#e5484d' }))}</div>
-          <div class="dbx-card" data-route="approvals" style="cursor:pointer"><h3>Approvals by Status</h3><div class="s" style="margin-bottom:10px">${s.approvals.length} requests</div>${pieChart(groupSegments(s.approvals, a => a.status, { Pending: '#f59e0b', Approved: '#10b981', Rejected: '#e5484d', Done: '#6d5ae6' }))}</div>
+          <div class="dbx-card" data-route="approvals" style="cursor:pointer"><h3>Approvals by Status</h3><div class="s" style="margin-bottom:10px">${s.approvals.length} requests</div>${pieChart(groupSegments(s.approvals, a => a.status, { Pending: '#f59e0b', Approved: '#10b981', Rejected: '#e5484d', Done: '#1f5aff' }))}</div>
           <div class="dbx-card" data-route="inventory" style="cursor:pointer"><h3>Stock by Expiry</h3><div class="s" style="margin-bottom:10px">${(s.stock || []).length} batches</div>${pieChart(stockExpirySegments())}</div>
           <div class="dbx-card" data-route="accounts" style="cursor:pointer"><h3>Expenses by Type</h3><div class="s" style="margin-bottom:10px">${s.expenses.length} claims</div>${pieChart(groupSegments(s.expenses, e => e.type))}</div>
           <div class="dbx-card" data-route="campaigns" style="cursor:pointer"><h3>Campaigns by Status</h3><div class="s" style="margin-bottom:10px">${s.campaigns.length} campaigns</div>${pieChart(groupSegments(s.campaigns, c => c.status, { Active: '#10b981', Planned: '#3b82f6', Completed: '#94a3b8' }))}</div>
@@ -761,6 +958,98 @@
         <div class="dbx-card">
           <div class="dbx-card-head"><div><h3>Live Approval Queue</h3><div class="s">ABM → RBM → Accounts</div></div><span class="pill">${pendingAppr.length} pending</span></div>
           ${pendingAppr.length ? approvalsTable(pendingAppr, true) : '<p class="muted">No pending approvals for ' + esc(divName) + '.</p>'}
+        </div>
+      </div>`;
+    },
+
+    // TSM mobile-first "Today" home — AI brief, target/incentive/points, day plan
+    today() {
+      const s = D.get(), m = s.metrics || {}, u = D.user() || {};
+      const first = (u.name || 'there').split(/\s+/)[0];
+      const now = new Date();
+      const hr = now.getHours();
+      const greet = hr < 12 ? 'Good morning' : hr < 17 ? 'Good afternoon' : 'Good evening';
+      const dateStr = now.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+      const me = (s.employees || []).find(e => e.id === u.id) || {};
+      const city = me.city || 'the field';
+      const only = arr => { const f = (arr || []).filter(x => x.rep === u.id); return f.length ? f : (arr || []); };
+      const docs = only(s.doctors), chems = only(s.chemists), dists = only(s.distributors);
+      const isBday = e => e && e.dob && daysUntilAnnual(e.dob) === 0;
+      const fmtT = mins => String(Math.floor(mins / 60)).padStart(2, '0') + ':' + String(mins % 60).padStart(2, '0');
+
+      // ---- ordered visit plan ----
+      const rows = [];
+      docs.forEach(d => {
+        const b = isBday(d);
+        const prod = (contactProducts(d.id, 'Doctor')[0]) || 'key brand';
+        rows.push({
+          route: 'doctors', id: d.id, name: `${d.name} · ${d.specialty || 'doctor'}`, cake: b,
+          sub: b ? 'Birthday today · greeting + visit' : `Detail ${prod} · ${(d.tier || 'Silver').toLowerCase()} tier`,
+          pill: b ? ['Celebration', 'warn'] : d.tier === 'Platinum' ? ['Pre-call ready', 'accent'] : d.tier === 'Gold' ? ['Kit approved', 'success'] : ['RCPA', 'muted'],
+          sortKey: (b ? 0 : 1) + (d.tier === 'Platinum' ? 0.1 : d.tier === 'Gold' ? 0.2 : 0.3),
+        });
+      });
+      chems.forEach(c => rows.push({ route: 'chemists', id: c.id, name: `${c.name} · chemist`, sub: 'RCPA due · order follow-up', pill: ['RCPA', 'muted'], sortKey: 2 }));
+      dists.forEach(d => rows.push({ route: 'distributors', id: d.id, name: `${d.name}`, sub: 'Weekly closing · stock + order', pill: ['Order', 'muted'], sortKey: 3 }));
+      rows.sort((a, b) => a.sortKey - b.sortKey);
+      let t = 9 * 60 + 30; rows.forEach(r => { r.time = fmtT(t); t += 70; });
+      const total = rows.length;
+
+      // ---- AI brief ----
+      const bdays = docs.filter(isBday);
+      const firstDoc = rows.find(r => r.route === 'doctors');
+      const brief = `${docs.length} doctors + ${chems.length} chemists today.`
+        + (firstDoc ? ` Start with ${firstDoc.name.split(' · ')[0]}.` : '')
+        + (bdays.length ? ` ${bdays[0].name}'s birthday today.` : '')
+        + (dists.length ? ` Weekly closing with ${dists[0].name}.` : '');
+
+      // ---- stat cards (derived from real data) ----
+      const coverage = Math.min(100, Math.round(m.doctorCoverage || 68));
+      const toGo = Math.max(0, ((100 - coverage) / 100 * 5)).toFixed(1);
+      const myVisits = (s.visits || []).filter(v => v.rep === u.id);
+      const streak = Math.max(1, new Set(myVisits.map(v => v.date)).size);
+      const points = 2000 + myVisits.length * 40 + streak * 60;
+      const slab = repPerkFor(coverage);
+      const incentive = slab && slab.amount ? slab.amount : 4850;
+      const nextSlab = REP_PERK_SLABS.filter(x => x.min > coverage).sort((a, b) => a.min - b.min)[0];
+      const nextGap = nextSlab && nextSlab.amount ? Math.max(0, nextSlab.amount - incentive) : 0;
+
+      const rowHtml = (r, i) => `<div class="today-visit ${i >= 5 ? 'extra hidden' : ''}" data-action="view" data-res="${r.route}" data-id="${r.id}">
+        <span class="today-time">${r.time}</span>
+        <div class="today-vmeta"><p class="today-vn">${esc(r.name)}</p><p class="today-vs">${r.cake ? '🎂 ' : ''}${esc(r.sub)}</p></div>
+        <span class="today-pill ${r.pill[1]}">${r.pill[0]}</span>
+      </div>`;
+
+      return `
+      <div class="today-wrap">
+        <div class="today-head">
+          <div><h1>${esc(greet)}, ${esc(first)}</h1>
+            <p class="today-meta">${esc(dateStr)} · ${esc(city)} · <span class="today-sync">● synced</span></p></div>
+          <button class="today-bell" data-action="toggleAlerts" title="Notifications">${UI_ICONS.bell}</button>
+        </div>
+        <div class="today-brief">
+          <p class="today-brief-h">${NAV_ICONS.ai} Superagent brief · 8:00</p>
+          <p class="today-brief-b">${esc(brief)}</p>
+        </div>
+        <div class="today-stats">
+          <div class="today-stat"><p class="l">Target</p><p class="v">${coverage}%</p><div class="today-bar"><i style="width:${coverage}%"></i></div><p class="s">₹${toGo}L to go</p></div>
+          <div class="today-stat"><p class="l">Incentive</p><p class="v">${inr(incentive)}</p><p class="s">${nextGap > 0 ? 'Next slab +' + inr(nextGap) : 'Top slab reached'}</p></div>
+          <div class="today-stat"><p class="l">Points</p><p class="v">★ ${points.toLocaleString('en-IN')}</p><p class="s">${streak}-day streak</p></div>
+        </div>
+        <div class="today-planhead">
+          <p>Today's plan · ${total} visits</p>
+          <a class="today-route" data-route="gps">◍ Route map</a>
+        </div>
+        <div class="today-list">
+          ${rows.map(rowHtml).join('') || '<p class="muted" style="padding:16px 0">No visits planned yet.</p>'}
+          ${total > 5 ? `<button class="today-more" data-action="todayMore">+ ${total - 5} more in route order <span class="chev">▾</span></button>` : ''}
+        </div>
+        <div class="today-tabbar">
+          <a class="tab active"><span>${TAB_ICONS.today}</span>Today</a>
+          <a class="tab" data-route="doctors"><span>${TAB_ICONS.doctors}</span>Doctors</a>
+          <button class="tab-mic" data-action="newVisit" title="Voice-log a visit">${TAB_ICONS.mic}</button>
+          <a class="tab" data-route="approvals"><span>${TAB_ICONS.ticket}</span>Tickets</a>
+          <a class="tab" data-route="ai"><span>${TAB_ICONS.chat}</span>Chat</a>
         </div>
       </div>`;
     },
@@ -846,7 +1135,7 @@
           <tbody>${list.map(x => {
             const a = x.ach;
             return `<tr>
-              <td><b>${esc(x.e.name)}</b></td>
+              <td>${nameAv(x.e.name)}</td>
               <td><span class="pill">${x.kind}</span></td>
               <td>${tierBadge(x.e.tier || 'Silver')}</td>
               <td>${a.target ? inr(a.target) : '<span class="muted">not set</span>'}</td>
@@ -861,6 +1150,12 @@
         ${PERK_SLABS.map(sl => `<div class="card"><div class="between"><h3><span class="badge ${sl.badge}">${sl.label}</span></h3><b>${sl.rate ? (sl.rate * 100) + '%' : '—'}</b></div>
           <div class="sub" style="margin-top:6px">${sl.min === 100 ? '100% and above' : sl.min === 80 ? '80% – 99% of target' : 'below 80%'}</div>
           <div style="margin-top:6px">${esc(sl.perk)}</div></div>`).join('')}
+      </div>
+      <div class="card mt">
+        <div class="section-head"><h2>Target-Achieved SMS Alerts</h2>
+          <button class="btn sm" data-action="smsCheck">Run achievement check</button></div>
+        <div class="sub" style="margin-top:-8px">When a partner reaches <b>100%</b> of target, a congratulatory SMS is triggered automatically. Each achievement texts once. Configure an SMS gateway (env <code>SMS_SEND_URL</code> + <code>SMS_API_KEY</code>) to deliver for real — until then messages are logged as <b>simulated</b>.</div>
+        <div id="sms-panel"><p class="muted">Loading SMS outbox…</p></div>
       </div>`;
     },
 
@@ -874,7 +1169,7 @@
           <input data-search="chem-table" placeholder="🔍 Search chemists…" style="max-width:240px;padding:8px 11px;border:1px solid var(--line);border-radius:9px"></div>
         <div class="table-wrap"><table id="chem-table"><thead><tr><th>Chemist</th><th>Tier</th><th>Area</th><th>Stock Qty</th><th>Monthly Value</th><th>Target</th><th>Linked Rep</th><th></th></tr></thead>
         <tbody>${s.chemists.map(c => { const a = tradeAchievement(c, 'Chemist'); return `<tr data-tier="${c.tier || 'Silver'}">
-          <td><b>${esc(c.name)}</b></td><td>${tierBadge(c.tier || 'Silver')}</td><td>${esc(c.area)}</td>
+          <td>${nameAv(c.name)}</td><td>${tierBadge(c.tier || 'Silver')}</td><td>${esc(c.area)}</td>
           <td><b>${ownerStockQty(c.id).toLocaleString('en-IN')}</b> u${stockBadge(c.id)}</td>
           <td>${inr(c.monthlyValue)}</td>
           <td>${a.target ? `<div class="flex"><div class="bar" style="width:55px"><i style="width:${Math.min(a.pct, 100)}%;${a.pct >= 100 ? 'background:var(--ok)' : a.pct >= 80 ? 'background:var(--warn)' : 'background:var(--danger)'}"></i></div><span class="badge ${a.slab.badge}">${a.pct}%</span><button class="btn ghost sm" data-action="setTarget" data-res="chemists" data-id="${c.id}" title="Edit target">✎</button></div>` : `<button class="btn ghost sm" data-action="setTarget" data-res="chemists" data-id="${c.id}">Set target</button>`}</td>
@@ -893,7 +1188,7 @@
           <input data-search="dist-table" placeholder="🔍 Search distributors…" style="max-width:240px;padding:8px 11px;border:1px solid var(--line);border-radius:9px"></div>
         <div class="table-wrap"><table id="dist-table"><thead><tr><th>Distributor</th><th>Tier</th><th>City</th><th>Stock Qty</th><th>Secondary Sales</th><th>Target</th><th>Last Closing</th><th></th></tr></thead>
         <tbody>${s.distributors.map(d => { const a = tradeAchievement(d, 'Distributor'); return `<tr data-tier="${d.tier || 'Silver'}">
-          <td><b>${esc(d.name)}</b></td><td>${tierBadge(d.tier || 'Silver')}</td><td>${esc(d.city)}</td>
+          <td>${nameAv(d.name)}</td><td>${tierBadge(d.tier || 'Silver')}</td><td>${esc(d.city)}</td>
           <td><b>${ownerStockQty(d.id).toLocaleString('en-IN')}</b> u${stockBadge(d.id)}</td>
           <td>${inr(d.secondarySales)}</td>
           <td>${a.target ? `<div class="flex"><div class="bar" style="width:55px"><i style="width:${Math.min(a.pct, 100)}%;${a.pct >= 100 ? 'background:var(--ok)' : a.pct >= 80 ? 'background:var(--warn)' : 'background:var(--danger)'}"></i></div><span class="badge ${a.slab.badge}">${a.pct}%</span><button class="btn ghost sm" data-action="setTarget" data-res="distributors" data-id="${d.id}" title="Edit target">✎</button></div>` : `<button class="btn ghost sm" data-action="setTarget" data-res="distributors" data-id="${d.id}">Set target</button>`}</td>
@@ -911,8 +1206,8 @@
       <div class="table-wrap card"><table id="visit-table">
         <thead><tr><th>Date</th><th>Rep</th><th>Type</th><th>Target</th><th>Check-in</th><th>Geo</th><th>Commit</th><th>Sentiment</th><th>Summary</th><th></th></tr></thead>
         <tbody>${s.visits.slice().reverse().map(v => `<tr>
-          <td>${v.date}</td><td>${esc(D.empName(v.rep))}</td><td><span class="pill">${v.type}</span></td>
-          <td><b>${esc(v.type === 'Doctor' ? D.docName(v.targetId) : D.chemName(v.targetId))}</b></td>
+          <td>${v.date}</td><td>${nameAv(D.empName(v.rep))}</td><td><span class="pill">${v.type}</span></td>
+          <td>${nameAv(v.type === 'Doctor' ? D.docName(v.targetId) : D.chemName(v.targetId))}</td>
           <td>${v.checkin}</td>
           <td>${v.geoVerified ? '<span class="badge ok">✓ Verified</span>' : '<span class="badge danger">⚠ Mock?</span>'}</td>
           <td>${v.commitment ? v.commitment + ' u' : '—'}</td>
@@ -981,8 +1276,8 @@
         <div class="table-wrap"><table>
           <thead><tr><th>Date</th><th>Rep</th><th>Type</th><th>Target</th><th>Check-in</th><th>Summary</th><th></th></tr></thead>
           <tbody>${flaggedV.map(v => `<tr>
-            <td>${v.date}</td><td>${esc(D.empName(v.rep))}</td><td><span class="pill">${v.type}</span></td>
-            <td><b>${esc(targetName(v))}</b></td><td>${v.checkin}</td>
+            <td>${v.date}</td><td>${nameAv(D.empName(v.rep))}</td><td><span class="pill">${v.type}</span></td>
+            <td>${nameAv(targetName(v))}</td><td>${v.checkin}</td>
             <td class="muted" style="max-width:240px">${v.photo ? '📷 ' : ''}${esc(v.summary)}</td>
             <td class="t-actions">
               <button class="btn ghost sm" data-action="view" data-res="visits" data-id="${v.id}">View</button>
@@ -1505,13 +1800,13 @@
       <div class="grid cols-2 mt">
         <div class="card"><h3>Attendance — Today (${td})</h3><div class="sub">derived from geo-tagged field activity</div>
           <div class="table-wrap"><table><thead><tr><th>Employee</th><th>Status</th><th>Calls today</th><th>Last active</th></tr></thead>
-          <tbody>${att.map(a => `<tr><td><b>${esc(a.r.name)}</b> <span class="pill">${esc(a.r.role)}</span></td>
+          <tbody>${att.map(a => `<tr><td>${nameAv(a.r.name)} <span class="pill">${esc(a.r.role)}</span></td>
             <td>${a.present ? '<span class="badge ok">● Present</span>' : '<span class="badge muted">○ Not yet</span>'}</td>
             <td>${a.calls}</td><td>${a.last}</td></tr>`).join('')}</tbody></table></div>
         </div>
         <div class="card"><div class="section-head"><h3>Leave Management</h3>${addBtn('leaves', 'Apply Leave')}</div>
           <div class="table-wrap"><table><thead><tr><th>Employee</th><th>Type</th><th>Dates</th><th>Days</th><th>Status</th><th></th></tr></thead>
-          <tbody>${leaves.map(l => `<tr><td><b>${esc(D.empName(l.rep))}</b></td><td>${esc(l.type)}</td><td class="muted">${l.fromDate} → ${l.toDate}</td><td>${l.days}</td><td>${statusBadge(l.status)}</td>
+          <tbody>${leaves.map(l => `<tr><td>${nameAv(D.empName(l.rep))}</td><td>${esc(l.type)}</td><td class="muted">${l.fromDate} → ${l.toDate}</td><td>${l.days}</td><td>${statusBadge(l.status)}</td>
             <td class="t-actions">${l.status === 'Pending' && canApprove ? `<button class="btn sm" data-action="leaveSet" data-id="${l.id}" data-status="Approved">✓</button><button class="btn ghost sm" data-action="leaveSet" data-id="${l.id}" data-status="Rejected">✕</button>` : `<button class="btn ghost sm" data-action="del" data-res="leaves" data-id="${l.id}">✕</button>`}</td></tr>`).join('')}</tbody></table></div>
           ${canApprove ? '' : '<div class="note mt">Approvals are limited to RBM, Business Head & Admin.</div>'}
         </div>
@@ -1520,7 +1815,7 @@
         <div class="section-head"><h2 style="font-size:16px">Payroll &amp; Incentive Run</h2><button class="btn ghost sm" data-action="report" data-kind="payroll">⬇ CSV</button></div>
         <div class="sub" style="margin-top:-8px">Base salary + auto-computed incentive (from Target vs Achievement) − loss-of-pay + approved reimbursements${isAdmin ? ' · Admin can edit base salary' : ''}</div>
         <div class="table-wrap"><table><thead><tr><th>Employee</th><th>Role</th><th>Base Salary</th><th>Incentive</th><th>LOP</th><th>Reimburse</th><th>Net Payable</th>${isAdmin ? '<th></th>' : ''}</tr></thead>
-          <tbody>${payroll.map(p => `<tr><td><b>${esc(p.r.name)}</b></td><td><span class="pill">${esc(p.r.role)}</span></td>
+          <tbody>${payroll.map(p => `<tr><td>${nameAv(p.r.name)}</td><td><span class="pill">${esc(p.r.role)}</span></td>
             <td>${inr(p.base)}${p.r.salary == null ? ' <small class="muted">(default)</small>' : ''}</td><td class="${p.incentive ? 'delta up' : ''}">${p.incentive ? '+' + inr(p.incentive) : '—'}</td>
             <td>${p.lop ? '−' + inr(p.lop) : '—'}</td><td>${p.reimburse ? '+' + inr(p.reimburse) : '—'}</td><td><b>${inr(p.net)}</b></td>
             ${isAdmin ? `<td><button class="btn ghost sm" data-action="setSalary" data-id="${p.r.id}">✎ Salary</button></td>` : ''}</tr>`).join('')}</tbody></table></div>
@@ -1566,11 +1861,42 @@
         <div class="sub" style="margin-top:-8px">👥 BH → RBM → ABM → TSM with role-based access control. New users can sign in immediately.</div>
         <div class="table-wrap"><table id="team-table"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Division</th><th>Reports To</th><th>Location</th>${isAdmin ? '<th></th>' : ''}</tr></thead>
         <tbody>${s.employees.slice().sort((a, b) => order.indexOf(a.role) - order.indexOf(b.role)).map(e => `<tr>
-          <td><div class="flex"><span class="avatar" style="width:28px;height:28px;font-size:12px">${esc(e.name[0])}</span><b>${esc(e.name)}</b></div></td>
+          <td>${nameAv(e.name)}</td>
           <td class="muted">${esc(e.email || '—')}</td>
           <td><span class="pill">${esc(e.role)}</span></td><td>${esc(D.divName(e.division))}</td>
           <td>${e.reportsTo ? esc(D.empName(e.reportsTo)) : '—'}</td><td>${esc(e.city)}</td>
           ${isAdmin ? `<td>${e.id === D.user().id ? '<span class="muted">you</span>' : `<button class="btn ghost sm" data-action="delUser" data-id="${e.id}">✕</button>`}</td>` : ''}</tr>`).join('')}</tbody></table></div></div>`;
+    },
+
+    account() {
+      const s = D.get();
+      const me = (s.employees || []).find(e => e.id === (D.user() || {}).id) || D.user() || {};
+      return `
+      <div class="grid cols-2">
+        <div class="card">
+          <div class="section-head"><h2 style="font-size:16px">My Profile</h2><span class="pill">${esc(me.role || '')}</span></div>
+          <div class="sub" style="margin-top:-8px">Update your personal details. Email, role and division are managed by your administrator.</div>
+          <div class="field"><label>Full name</label><input id="pf-name" value="${esc(me.name || '')}"></div>
+          <div class="grid2">
+            <div class="field"><label>Email (login — read-only)</label><input value="${esc(me.email || '')}" disabled></div>
+            <div class="field"><label>Mobile</label><input id="pf-phone" value="${esc(me.phone || '')}" placeholder="+91 …"></div>
+          </div>
+          <div class="grid2">
+            <div class="field"><label>City / Location</label><input id="pf-city" value="${esc(me.city || '')}"></div>
+            <div class="field"><label>Division (read-only)</label><input value="${esc(me.division ? D.divName(me.division) : '—')}" disabled></div>
+          </div>
+          <button class="btn" data-action="saveProfile">Save profile</button>
+        </div>
+        <div class="card">
+          <div class="section-head"><h2 style="font-size:16px">Change Password</h2></div>
+          <div class="sub" style="margin-top:-8px">Choose a strong password of at least 6 characters.</div>
+          <div class="field"><label>Current password</label><input id="cp-cur" type="password" autocomplete="current-password"></div>
+          <div class="field"><label>New password</label><input id="cp-new" type="password" autocomplete="new-password"></div>
+          <div class="field"><label>Confirm new password</label><input id="cp-new2" type="password" autocomplete="new-password"></div>
+          <button class="btn" data-action="changePw">Update password</button>
+          <p class="tag" style="margin-top:14px">Signed in as <b>${esc(me.name || '')}</b> · <button class="btn ghost sm" data-action="logout">Log out</button></p>
+        </div>
+      </div>`;
     },
 
     settings() {
@@ -1635,7 +1961,7 @@
   }
   function docRow(d) {
     return `<tr data-tier="${d.tier}">
-      <td><div class="flex"><span class="avatar" style="width:30px;height:30px;font-size:12px">${esc(d.name.replace('Dr. ', '')[0])}</span><b>${esc(d.name)}</b></div></td>
+      <td>${nameAv(d.name)}</td>
       <td>${esc(d.specialty)}</td><td>${esc(d.hospital)}<br><small class="muted">${esc(d.city)}</small></td>
       <td>${tierBadge(d.tier)}</td>
       <td><div class="flex"><div class="bar" style="width:70px"><i style="width:${d.potential}%"></i></div>${d.potential}</div></td>
@@ -1846,6 +2172,7 @@
         { k: 'dob', l: 'Date of Birth (for gifting)', t: 'date' },
         { k: 'rep', l: 'Assigned Rep', t: 'select', o: reps }, { k: 'monthlyValue', l: 'Monthly Sales / Achieved (₹)', t: 'number' },
         { k: 'target', l: 'Monthly Target (₹) — for perks', t: 'number' },
+        { k: 'phone', l: 'Mobile (for target-achieved SMS)', t: 'text' },
         { k: 'lastVisit', l: 'Last Visit', t: 'date' },
         { k: 'lat', l: 'Latitude (for map)', t: 'number' }, { k: 'lng', l: 'Longitude (for map)', t: 'number' },
       ],
@@ -1856,6 +2183,7 @@
         { k: 'rep', l: 'Linked Rep', t: 'select', o: reps },
         { k: 'stockValue', l: 'Stock Value (₹)', t: 'number' }, { k: 'secondarySales', l: 'Secondary Sales / Achieved (₹)', t: 'number' },
         { k: 'target', l: 'Monthly Target (₹) — for perks', t: 'number' },
+        { k: 'phone', l: 'Mobile (for target-achieved SMS)', t: 'text' },
         { k: 'leadTime', l: 'CFA lead time (days) — for ROP', t: 'number' },
         { k: 'lastClosing', l: 'Last Closing', t: 'date' },
         { k: 'lat', l: 'Latitude (for map)', t: 'number' }, { k: 'lng', l: 'Longitude (for map)', t: 'number' },
@@ -1963,10 +2291,70 @@
 
   const defVal = (f) => f.def != null ? f.def : f.o && f.o.length ? f.o[0].v : f.t === 'number' ? 0 : f.t === 'date' ? today() : '';
 
+  // ---- visiting-card scanner (client-side OCR, lazy-loaded) --------------
+  let _ocrLoad;
+  function loadOCR() {
+    if (window.Tesseract) return Promise.resolve();
+    if (_ocrLoad) return _ocrLoad;
+    _ocrLoad = new Promise((resolve, reject) => {
+      const sc = document.createElement('script');
+      sc.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+      sc.async = true; sc.onload = resolve; sc.onerror = () => { _ocrLoad = null; reject(new Error('offline')); };
+      document.head.appendChild(sc);
+    });
+    return _ocrLoad;
+  }
+  const SCAN_ICON = _si('<rect x="2" y="4" width="20" height="16" rx="2.5"/><line x1="6" y1="9" x2="12" y2="9"/><line x1="6" y1="13" x2="10" y2="13"/><circle cx="16.5" cy="12.5" r="2.4"/>');
+  function cardScanHtml() {
+    return `<div class="scan-card">
+      <input type="file" id="scan-file" accept="image/*" capture="environment" style="display:none">
+      <button type="button" class="btn ghost sm" id="scan-btn" style="width:100%">${SCAN_ICON} Scan visiting card</button>
+      <div class="scan-body hidden" id="scan-body"><img id="scan-prev" alt="card"><span id="scan-status" class="muted"></span></div>
+    </div>`;
+  }
+  function parseCard(text) {
+    const lines = (text || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    const phones = [];
+    for (const l of lines) for (const cand of (l.match(/(\+?\d[\d\-\s().]{8,}\d)/g) || [])) {
+      const d = cand.replace(/[^\d]/g, '');
+      if (d.length >= 10 && d.length <= 13) phones.push({ raw: cand.replace(/[^\d+]/g, ''), d });
+    }
+    // prefer a mobile number (last 10 digits start 6–9) over a landline
+    let phone = ((phones.find(p => /[6-9]\d{9}$/.test(p.d)) || phones[0]) || {}).raw || '';
+    if (phone && !phone.startsWith('+') && phone.length === 10) phone = phone.replace(/(\d{5})(\d{5})/, '$1 $2');
+    const bad = /(hospital|clinic|pharma|medical|health|centre|center|road|street|nagar|lane|floor|www|http|@|\.com|\.in|ltd|pvt|mobile|phone|tel|fax|email|reg|consultant|surgeon|mbbs|\bm\.?d\.?\b|\bm\.?s\.?\b)/i;
+    let name = '';
+    const dr = lines.find(l => /\bdr\.?\b/i.test(l));
+    if (dr) name = dr.split(/[,|•·]/)[0].replace(/\s{2,}/g, ' ').trim();
+    else name = (lines.find(l => /^[A-Za-z][A-Za-z.\s]{2,40}$/.test(l) && l.split(/\s+/).length <= 4 && !bad.test(l)) || '').trim();
+    let specialty = '';
+    for (const [re, val] of [[/cardio/i, 'Cardiologist'], [/diabet|endocrin/i, 'Diabetologist'], [/gastro/i, 'Gastroenterologist'], [/ortho/i, 'Orthopedist'], [/neuro/i, 'Neurologist'], [/physician|general\s*med|family/i, 'General Physician']])
+      if (re.test(text)) { specialty = val; break; }
+    return { name, phone, specialty };
+  }
+  async function scanCard(file, modalEl) {
+    const body = modalEl.querySelector('#scan-body'), status = modalEl.querySelector('#scan-status'), prev = modalEl.querySelector('#scan-prev');
+    body.classList.remove('hidden');
+    try { prev.src = URL.createObjectURL(file); } catch (e) {}
+    status.textContent = 'Reading card…';
+    const setF = (k, val) => { const el = modalEl.querySelector('#ff-' + k); if (el && val) { el.value = val; el.classList.add('scan-hit'); } };
+    try {
+      await loadOCR();
+      const { data } = await Tesseract.recognize(file, 'eng');
+      const p = parseCard(data.text || '');
+      setF('name', p.name); setF('phone', p.phone); setF('specialty', p.specialty);
+      const got = [p.name && 'name', p.phone && 'phone', p.specialty && 'specialty'].filter(Boolean);
+      status.textContent = got.length ? 'Detected ' + got.join(' + ') + ' — please review and save.' : 'Couldn’t read the card clearly — please type the details.';
+    } catch (e) {
+      status.textContent = 'The card scanner needs internet the first time it runs. Please type the details.';
+    }
+  }
+
   function openForm(resource, existing, prefill) {
     const fields = fieldsFor(resource);
     const v = existing || prefill || {};
-    const body = fields.map(f => {
+    const scanUi = ['doctors', 'chemists', 'distributors'].includes(resource) ? cardScanHtml() : '';
+    const body = scanUi + fields.map(f => {
       let cur = (f.k in v) ? v[f.k] : defVal(f);
       if (f.bool) cur = (cur === true || cur === 'true') ? 'true' : 'false';
       if (f.t === 'select') return `<div class="field"><label>${f.l}</label><select id="ff-${f.k}">${f.o.map(o => `<option value="${esc(o.v)}" ${String(o.v) === String(cur) ? 'selected' : ''}>${esc(o.t)}</option>`).join('')}</select></div>`;
@@ -1976,6 +2364,8 @@
     }).join('');
     const m = modal((existing ? 'Edit ' : 'Add ') + (SINGULAR[resource] || resource), body,
       `<button class="btn ghost sm" data-close>Cancel</button><button class="btn sm" id="ff-save">${existing ? 'Save changes' : 'Create'}</button>`);
+    const sBtn = m.querySelector('#scan-btn'), sFile = m.querySelector('#scan-file');
+    if (sBtn && sFile) { sBtn.onclick = () => sFile.click(); sFile.onchange = () => { if (sFile.files && sFile.files[0]) scanCard(sFile.files[0], m); }; }
     m.querySelector('#ff-save').onclick = async () => {
       const obj = {};
       for (const f of fields) {
@@ -2160,12 +2550,23 @@
         case 'toggleAlerts': { const p = document.getElementById('alerts-panel'); if (p) p.classList.toggle('hidden'); break; }
         case 'toggleNav': document.body.classList.toggle('nav-open'); break;
         case 'closeNav': document.body.classList.remove('nav-open'); break;
+        case 'toggleSec': { const sec = el.closest('.nav-sec'); const willOpen = !sec.classList.contains('open'); navOpen[el.dataset.sec] = willOpen; sec.classList.toggle('open', willOpen); break; }
+        case 'todayMore': { document.querySelectorAll('.today-visit.extra').forEach(x => x.classList.remove('hidden')); el.remove(); break; }
+        case 'smsCheck': refreshSmsPanel(true); break;
         case 'toggleView': toggleView(); break;
         case 'changePw': {
           const cur = $('#cp-cur').value, nw = $('#cp-new').value, nw2 = $('#cp-new2').value;
           if (!nw || nw.length < 6) return toast('New password must be at least 6 characters');
           if (nw !== nw2) return toast('New passwords do not match');
           try { await D.changePassword(cur, nw); toast('Password updated'); $('#cp-cur').value = $('#cp-new').value = $('#cp-new2').value = ''; }
+          catch (err) { toast(err.message); }
+          break;
+        }
+        case 'saveProfile': {
+          const name = ($('#pf-name').value || '').trim();
+          if (!name) return toast('Name cannot be empty');
+          const patch = { name, phone: ($('#pf-phone').value || '').trim(), city: ($('#pf-city').value || '').trim() };
+          try { await D.updateMe(patch); session = D.user(); toast('Profile updated'); route(); }
           catch (err) { toast(err.message); }
           break;
         }
@@ -2441,7 +2842,51 @@
     window.open(`https://www.google.com/maps/dir/?api=1${origin}&destination=${t.lat},${t.lng}&travelmode=driving`, '_blank');
   }
 
-  const AFTER = { gps: initGpsMap };
+  // ---- SMS trigger: congratulate partners who reach 100% of target --------
+  async function runAchievementSms() {
+    const s = D.get();
+    const partners = [
+      ...(s.chemists || []).map(c => ({ e: c, kind: 'Chemist' })),
+      ...(s.distributors || []).map(d => ({ e: d, kind: 'Distributor' })),
+    ];
+    let queued = 0;
+    for (const p of partners) {
+      const a = tradeAchievement(p.e, p.kind);
+      if (a.pct >= 100) {
+        const msg = `Congratulations ${p.e.name}! You've achieved ${a.pct}% of your trade target (${inr(a.achieved)} of ${inr(a.target)}) and unlocked your reward: ${a.slab.perk}. Thank you for partnering with Amber LifeSciences.`;
+        try { const r = await D.smsSend({ ref: p.e.id, trigger: 'trade_target', to: p.e.phone || '', name: p.e.name, message: msg }); if (r && !r.duplicate) queued++; } catch (e) {}
+      }
+    }
+    return queued;
+  }
+  function smsStatusBadge(st) {
+    const map = { sent: 'ok', simulated: 'info', 'no-number': 'pending', failed: 'danger', queued: 'muted' };
+    return `<span class="badge ${map[st] || 'muted'}">${esc(st)}</span>`;
+  }
+  function smsPanelHtml(box) {
+    if (!box.length) return '<p class="muted">No SMS triggered yet — no partner has reached 100% of target.</p>';
+    return `<div class="between" style="margin-bottom:10px"><span class="pill">${box.length} message${box.length > 1 ? 's' : ''}</span></div>
+      <div class="table-wrap"><table><thead><tr><th>Recipient</th><th>Phone</th><th>Trigger</th><th>Status</th><th>Message</th><th>When</th></tr></thead>
+      <tbody>${box.map(m => `<tr>
+        <td>${nameAv(m.name || '—')}</td>
+        <td>${esc(m.to || '—')}</td>
+        <td><span class="pill">${esc(m.trigger)}</span></td>
+        <td>${smsStatusBadge(m.status)}</td>
+        <td class="muted" style="max-width:340px">${esc(m.message)}</td>
+        <td class="muted" style="white-space:nowrap">${esc((m.at || '').replace('T', ' ').slice(0, 16))}</td>
+      </tr>`).join('')}</tbody></table></div>`;
+  }
+  async function refreshSmsPanel(runCheck) {
+    const el = document.getElementById('sms-panel'); if (!el) return;
+    try {
+      const n = await runAchievementSms();
+      if (runCheck) toast(n ? n + ' new achievement SMS triggered' : 'All caught up — no new achievements');
+      const box = await D.smsOutbox();
+      el.innerHTML = smsPanelHtml(box);
+    } catch (e) { el.innerHTML = '<p class="muted">SMS panel error: ' + esc(e.message) + '</p>'; }
+  }
+
+  const AFTER = { gps: initGpsMap, schemes: () => refreshSmsPanel(false) };
 
   // ---- dashboard CSV export ----------------------------------------------
   // generic CSV download from an array-of-arrays
@@ -2520,16 +2965,19 @@
 
   // ---- router -------------------------------------------------------------
   async function route() {
-    const r = (location.hash || '#dashboard').slice(1);
     if (!D.isAuthed()) return renderAuth();
     if (!D.get()) {
       try { await D.bootstrap(); } catch (e) { D.logout(); authScreen = 'landing'; return renderAuth(); }
     }
     session = D.user();
-    const blocked = VIEWS[r] && !canAccess(r);
-    const target = (VIEWS[r] && canAccess(r)) ? r : 'dashboard';
+    const r = (location.hash || ('#' + homeRoute())).slice(1);
+    if (VIEWS[r] && !canAccess(r)) {
+      toast('That module isn’t part of your role');
+      location.hash = '#' + homeRoute();
+      return;
+    }
+    const target = (VIEWS[r] && canAccess(r)) ? r : homeRoute();
     renderShell(target);
-    if (blocked) toast('That page is restricted to management roles');
   }
   function boot() { applyView(); route(); }
   window.addEventListener('hashchange', route);

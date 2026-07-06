@@ -29,8 +29,8 @@ const nowISO = () => new Date().toISOString();
 // type flags: j=JSON, b=boolean(int), n=number
 const R = {
   doctors: { table: 'doctors', id: 'D', f: { name: 'name', specialty: 'specialty', hospital: 'hospital', city: 'city', tier: 'tier', potential: ['potential', 'n'], dob: 'dob', anniversary: 'anniversary', phone: 'phone', rep: 'rep_id', lastVisit: 'last_visit', linkedChemists: ['linked_chemists', 'j'], lat: ['lat', 'n'], lng: ['lng', 'n'] } },
-  chemists: { table: 'chemists', id: 'C', f: { name: 'name', area: 'area', city: 'city', rep: 'rep_id', monthlyValue: ['monthly_value', 'n'], lastVisit: 'last_visit', lat: ['lat', 'n'], lng: ['lng', 'n'], tier: 'tier', dob: 'dob', target: ['target', 'n'] } },
-  distributors: { table: 'distributors', id: 'DS', f: { name: 'name', city: 'city', rep: 'rep_id', stockValue: ['stock_value', 'n'], secondarySales: ['secondary_sales', 'n'], lastClosing: 'last_closing', lat: ['lat', 'n'], lng: ['lng', 'n'], tier: 'tier', dob: 'dob', target: ['target', 'n'], leadTime: ['lead_time_days', 'n'] } },
+  chemists: { table: 'chemists', id: 'C', f: { name: 'name', area: 'area', city: 'city', rep: 'rep_id', monthlyValue: ['monthly_value', 'n'], lastVisit: 'last_visit', lat: ['lat', 'n'], lng: ['lng', 'n'], tier: 'tier', dob: 'dob', target: ['target', 'n'], phone: 'phone' } },
+  distributors: { table: 'distributors', id: 'DS', f: { name: 'name', city: 'city', rep: 'rep_id', stockValue: ['stock_value', 'n'], secondarySales: ['secondary_sales', 'n'], lastClosing: 'last_closing', lat: ['lat', 'n'], lng: ['lng', 'n'], tier: 'tier', dob: 'dob', target: ['target', 'n'], leadTime: ['lead_time_days', 'n'], phone: 'phone' } },
   visits: { table: 'visits', id: 'V', f: { rep: 'rep_id', type: 'type', targetId: 'target_id', date: 'date', checkin: 'checkin', geoVerified: ['geo_verified', 'b'], products: ['products', 'j'], summary: 'summary', commitment: ['commitment', 'n'], followUp: 'follow_up', sentiment: 'sentiment', photo: 'photo' } },
   rcpa: { table: 'rcpa', id: 'R', f: { doctor: 'doctor_id', chemist: 'chemist_id', date: 'date', ourBrand: 'our_brand', ourScripts: ['our_scripts', 'n'], competitor: 'competitor', compScripts: ['comp_scripts', 'n'], share: ['share', 'n'] } },
   campaigns: { table: 'campaigns', id: 'CM', f: { name: 'name', product: 'product_id', specialty: 'specialty', venue: 'venue', status: 'status', reach: ['reach', 'n'], sales: ['sales', 'n'], spend: ['spend', 'n'] } },
@@ -79,6 +79,28 @@ function listAll(res, org) {
   return rows.map(r => rowToDto(res, r));
 }
 
+// Row-level data scoping. A TSM (field rep) may only see their OWN records —
+// their doctors/chemists/distributors and everything derived from them — never
+// the division's or another division's data. Everyone else is unchanged here.
+function scopeRows(resource, rows, user, org) {
+  if (!user || user.role !== 'TSM') return rows;
+  const uid = user.uid;
+  const ownedIds = (table) => new Set(db.prepare(`SELECT id FROM ${table} WHERE org_id=? AND rep_id=?`).all(org, uid).map(r => r.id));
+  switch (resource) {
+    case 'doctors': case 'chemists': case 'distributors':
+    case 'visits': case 'expenses': case 'todos': case 'leaves':
+      return rows.filter(r => r.rep === uid);
+    case 'rcpa': { const d = ownedIds('doctors'), c = ownedIds('chemists'); return rows.filter(r => d.has(r.doctor) || c.has(r.chemist)); }
+    case 'samples': { const d = ownedIds('doctors'); return rows.filter(r => d.has(r.doctor)); }
+    case 'orders': { const c = ownedIds('chemists'), s = ownedIds('distributors'); return rows.filter(r => c.has(r.party) || s.has(r.party)); }
+    case 'stock': { const c = ownedIds('chemists'), s = ownedIds('distributors'); return rows.filter(r => c.has(r.owner) || s.has(r.owner)); }
+    case 'recon': { const s = ownedIds('distributors'); return rows.filter(r => s.has(r.distributor)); }
+    case 'approvals': return rows.filter(r => r.raisedBy === uid);
+    case 'campaigns': return []; // division/org marketing — not a rep's own data
+    default: return rows;        // products, divisions, edetail: shared reference/content
+  }
+}
+
 // ---- helpers --------------------------------------------------------------
 function send(out, code, data, headers = {}) {
   const body = typeof data === 'string' ? data : JSON.stringify(data);
@@ -123,13 +145,27 @@ const SALES_TREND = [
   { m: 'May', primary: 58, secondary: 44 }, { m: 'Jun', primary: 61, secondary: 47 },
 ];
 
-function bootstrap(org) {
+function bootstrap(org, user) {
   const orgRow = db.prepare('SELECT * FROM orgs WHERE id=?').get(org);
   const divisions = db.prepare('SELECT id,name,head FROM divisions WHERE org_id=?').all(org);
-  const employees = db.prepare('SELECT id,name,email,role,division_id as division,reports_to as reportsTo,city,target_doctors as targetDoctors,target_chemists as targetChemists,salary FROM users WHERE org_id=?').all(org);
+  let employees = db.prepare('SELECT id,name,email,role,division_id as division,reports_to as reportsTo,city,target_doctors as targetDoctors,target_chemists as targetChemists,salary,phone FROM users WHERE org_id=?').all(org);
   const products = db.prepare('SELECT id,name,division_id as division,specialty,price,mrp,gst,retail_margin as retailMargin,stockist_margin as stockistMargin FROM products WHERE org_id=?').all(org);
   const data = { org: orgRow, divisions, employees, products, metrics: metrics(org), salesTrend: SALES_TREND };
-  for (const key of Object.keys(R)) data[key] = listAll(R[key], org);
+  for (const key of Object.keys(R)) data[key] = scopeRows(key, listAll(R[key], org), user, org);
+
+  // TSM: strip org-level analytics, limit the employee roster, and report their
+  // OWN coverage rather than the division's.
+  if (user && user.role === 'TSM') {
+    data.salesTrend = [];
+    const self = employees.find(e => e.id === user.uid);
+    const keep = new Set([user.uid]); if (self && self.reportsTo) keep.add(self.reportsTo);
+    data.employees = employees.filter(e => keep.has(e.id));
+    const docIds = new Set(data.doctors.map(d => d.id));
+    const visitedOwn = new Set(data.visits.filter(v => v.type === 'Doctor').map(v => v.targetId));
+    data.metrics = Object.assign({}, data.metrics, {
+      doctorCoverage: data.doctors.length ? Math.round([...visitedOwn].filter(id => docIds.has(id)).length / data.doctors.length * 100) : 0,
+    });
+  }
   return data;
 }
 
@@ -150,6 +186,29 @@ function advanceApproval(ap, role, name) {
   else stage = chain[i + 1];
   return { stage, status, log: JSON.stringify(log) };
 }
+
+// ---- SMS notifications ----------------------------------------------------
+// Real delivery needs an SMS gateway: set env SMS_SEND_URL + SMS_API_KEY (and
+// optionally SMS_SENDER / SMS_PROVIDER) to send for real. Without them, every
+// message is recorded as 'simulated' so the trigger is fully testable offline.
+function sendSmsViaGateway(to, message) {
+  return new Promise((resolve) => {
+    const url = process.env.SMS_SEND_URL, key = process.env.SMS_API_KEY;
+    if (!to) return resolve({ status: 'no-number', provider: '-' });
+    if (!url || !key) return resolve({ status: 'simulated', provider: 'simulated' });
+    try {
+      const u = new URL(url);
+      const body = JSON.stringify({ to, message, sender: process.env.SMS_SENDER || 'AMBER' });
+      const lib = u.protocol === 'http:' ? require('node:http') : require('node:https');
+      const rq = lib.request(u, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key, 'Content-Length': Buffer.byteLength(body) } }, (r) => {
+        let d = ''; r.on('data', c => d += c); r.on('end', () => resolve({ status: r.statusCode < 300 ? 'sent' : 'failed', provider: process.env.SMS_PROVIDER || 'gateway' }));
+      });
+      rq.on('error', () => resolve({ status: 'failed', provider: process.env.SMS_PROVIDER || 'gateway' }));
+      rq.write(body); rq.end();
+    } catch (e) { resolve({ status: 'failed', provider: 'gateway' }); }
+  });
+}
+const smsRow = (org, ref, trigger) => db.prepare('SELECT id,ref,trigger,to_phone as "to",name,message,status,provider,created_at as at FROM sms_outbox WHERE org_id=? AND ref=? AND trigger=?').get(org, ref, trigger);
 
 // ---- request router -------------------------------------------------------
 async function requestHandler(req, res) {
@@ -225,7 +284,20 @@ async function handleApi(req, res, p, url) {
   const org = user.org;
 
   if (p === '/api/me' && method === 'GET') return send(res, 200, { user });
-  if (p === '/api/bootstrap' && method === 'GET') return send(res, 200, bootstrap(org));
+  if (p === '/api/bootstrap' && method === 'GET') return send(res, 200, bootstrap(org, user));
+
+  // --- self-service profile: any user can edit their OWN name / city / phone ---
+  if (p === '/api/me' && method === 'PATCH') {
+    const b = await readBody(req);
+    const sets = [], vals = [];
+    if (b.name != null && String(b.name).trim()) { sets.push('name=?'); vals.push(String(b.name).trim()); }
+    if (b.phone != null) { sets.push('phone=?'); vals.push(String(b.phone).trim()); }
+    if (b.city != null) { sets.push('city=?'); vals.push(String(b.city).trim()); }
+    if (sets.length) db.prepare(`UPDATE users SET ${sets.join(',')} WHERE id=?`).run(...vals, user.uid);
+    audit(org, user.uid, 'update-profile', user.uid);
+    const row = db.prepare('SELECT id,name,email,role,division_id as division,reports_to as reportsTo,city,target_doctors as targetDoctors,target_chemists as targetChemists,salary,phone FROM users WHERE id=?').get(user.uid);
+    return send(res, 200, row);
+  }
 
   // --- change own password ---
   if (p === '/api/auth/change-password' && method === 'POST') {
@@ -246,6 +318,28 @@ async function handleApi(req, res, p, url) {
       FROM audit_log a LEFT JOIN users u ON u.id = a.user_id
       WHERE a.org_id=? ORDER BY a.id DESC LIMIT ?`).all(org, limit);
     return send(res, 200, rows);
+  }
+
+  // --- SMS outbox + idempotent trigger send ---
+  if (p === '/api/sms/outbox' && method === 'GET') {
+    const rows = db.prepare('SELECT id,ref,trigger,to_phone as "to",name,message,status,provider,created_at as at FROM sms_outbox WHERE org_id=? ORDER BY created_at DESC, rowid DESC LIMIT 100').all(org);
+    return send(res, 200, rows);
+  }
+  if (p === '/api/sms/send' && method === 'POST') {
+    const b = await readBody(req);
+    const ref = String(b.ref || '').trim(), trigger = String(b.trigger || 'manual').trim();
+    const name = String(b.name || '').trim(), to = String(b.to || '').trim();
+    const message = String(b.message || '').trim();
+    if (!message) return send(res, 400, { error: 'message is required' });
+    if (ref) { const existing = smsRow(org, ref, trigger); if (existing) return send(res, 200, { ...existing, duplicate: true }); }
+    const result = await sendSmsViaGateway(to, message);
+    const rowId = uid('SMS'), at = nowISO(), refKey = ref || rowId;
+    try {
+      db.prepare('INSERT INTO sms_outbox (id,org_id,ref,trigger,to_phone,name,message,status,provider,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)')
+        .run(rowId, org, refKey, trigger, to, name, message, result.status, result.provider, at);
+    } catch (e) { const ex = smsRow(org, refKey, trigger); if (ex) return send(res, 200, { ...ex, duplicate: true }); }
+    audit(org, user.uid, 'sms:' + trigger, name + ' → ' + result.status);
+    return send(res, 201, { id: rowId, ref: refKey, trigger, to, name, message, status: result.status, provider: result.provider, at });
   }
 
   // --- approval actions ---
@@ -271,7 +365,7 @@ async function handleApi(req, res, p, url) {
   m = p.match(/^\/api\/users(?:\/([^/]+))?$/);
   if (m) {
     if (method === 'GET' && !m[1]) {
-      const rows = db.prepare('SELECT id,name,email,role,division_id as division,reports_to as reportsTo,city,target_doctors as targetDoctors,target_chemists as targetChemists,salary FROM users WHERE org_id=?').all(org);
+      const rows = db.prepare('SELECT id,name,email,role,division_id as division,reports_to as reportsTo,city,target_doctors as targetDoctors,target_chemists as targetChemists,salary,phone FROM users WHERE org_id=?').all(org);
       return send(res, 200, rows);
     }
     if (method === 'POST') {
@@ -285,7 +379,7 @@ async function handleApi(req, res, p, url) {
         newId, org, b.name, String(b.email).trim(), await hashPwAsync(b.password || 'amber123'),
         b.role || 'TSM', b.division || null, b.reportsTo || null, b.city || '');
       audit(org, user.uid, 'create:user', newId);
-      const row = db.prepare('SELECT id,name,email,role,division_id as division,reports_to as reportsTo,city,target_doctors as targetDoctors,target_chemists as targetChemists,salary FROM users WHERE id=?').get(newId);
+      const row = db.prepare('SELECT id,name,email,role,division_id as division,reports_to as reportsTo,city,target_doctors as targetDoctors,target_chemists as targetChemists,salary,phone FROM users WHERE id=?').get(newId);
       return send(res, 201, row);
     }
     if (method === 'DELETE' && m[1]) {
@@ -306,7 +400,7 @@ async function handleApi(req, res, p, url) {
       if (b.salary != null && user.role === 'Admin') { sets.push('salary=?'); vals.push(Math.max(0, Number(b.salary) || 0)); }
       if (sets.length) db.prepare(`UPDATE users SET ${sets.join(',')} WHERE id=? AND org_id=?`).run(...vals, m[1], org);
       audit(org, user.uid, 'set-target:user', m[1]);
-      const row = db.prepare('SELECT id,name,email,role,division_id as division,reports_to as reportsTo,city,target_doctors as targetDoctors,target_chemists as targetChemists,salary FROM users WHERE id=? AND org_id=?').get(m[1], org);
+      const row = db.prepare('SELECT id,name,email,role,division_id as division,reports_to as reportsTo,city,target_doctors as targetDoctors,target_chemists as targetChemists,salary,phone FROM users WHERE id=? AND org_id=?').get(m[1], org);
       return row ? send(res, 200, row) : send(res, 404, { error: 'Not found' });
     }
   }
@@ -321,10 +415,13 @@ async function handleApi(req, res, p, url) {
       return send(res, 403, { error: 'Only Admin can manage ' + m[1] });
     }
 
-    if (method === 'GET' && !id) return send(res, 200, listAll(res2, org));
+    if (method === 'GET' && !id) return send(res, 200, scopeRows(m[1], listAll(res2, org), user, org));
     if (method === 'GET' && id) {
       const row = db.prepare(`SELECT * FROM ${res2.table} WHERE id=? AND org_id=?`).get(id, org);
-      return row ? send(res, 200, rowToDto(res2, row)) : send(res, 404, { error: 'Not found' });
+      if (!row) return send(res, 404, { error: 'Not found' });
+      const dto = rowToDto(res2, row);
+      // a TSM may only fetch a record that falls within their own data
+      return scopeRows(m[1], [dto], user, org).length ? send(res, 200, dto) : send(res, 403, { error: 'Not permitted' });
     }
     if (method === 'POST') {
       const dto = await readBody(req);

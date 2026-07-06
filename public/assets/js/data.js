@@ -106,6 +106,15 @@ const AmberData = (() => {
     },
     changePassword(current, next) { return api('/auth/change-password', { method: 'POST', body: { current, next } }); },
     getAudit(limit = 100) { return api('/audit?limit=' + limit); },
+    smsOutbox() { return api('/sms/outbox'); },
+    smsSend(payload) { return api('/sms/send', { method: 'POST', body: payload }); },
+    async updateMe(patch) {
+      const row = await api('/me', { method: 'PATCH', body: patch });
+      // reflect changes in the cached session + employee list without a re-login
+      if (user) { user.name = row.name; sessionStorage.setItem('amber_user', JSON.stringify(user)); }
+      if (state && state.employees) { const i = state.employees.findIndex(e => e.id === row.id); if (i >= 0) state.employees[i] = row; }
+      return row;
+    },
 
     // ---- lookups ----
     empName: (id) => ((state.employees || []).find(e => e.id === id) || {}).name || id,

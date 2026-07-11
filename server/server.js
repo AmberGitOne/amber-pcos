@@ -389,15 +389,16 @@ async function handleApi(req, res, p, url) {
       audit(org, user.uid, 'delete:user', m[1]);
       return send(res, 200, { ok: true });
     }
-    // set employee daily visit targets — RBM, Business Head and Admin only
+    // targets — RBM/BH/Admin; base salary (payroll data) — Admin + Accounts only
     if (method === 'PATCH' && m[1]) {
-      if (!['Admin', 'Business Head', 'RBM'].includes(user.role)) return send(res, 403, { error: 'Only RBM, Business Head or Admin can set employee targets' });
+      const canTargets = ['Admin', 'Business Head', 'RBM'].includes(user.role);
+      const canSalary = ['Admin', 'Accounts'].includes(user.role);
+      if (!canTargets && !canSalary) return send(res, 403, { error: 'Not permitted to edit this user' });
       const b = await readBody(req);
       const sets = [], vals = [];
-      if (b.targetDoctors != null) { sets.push('target_doctors=?'); vals.push(Math.max(0, Number(b.targetDoctors) || 0)); }
-      if (b.targetChemists != null) { sets.push('target_chemists=?'); vals.push(Math.max(0, Number(b.targetChemists) || 0)); }
-      // base salary is HR/payroll data — Admin only
-      if (b.salary != null && user.role === 'Admin') { sets.push('salary=?'); vals.push(Math.max(0, Number(b.salary) || 0)); }
+      if (canTargets && b.targetDoctors != null) { sets.push('target_doctors=?'); vals.push(Math.max(0, Number(b.targetDoctors) || 0)); }
+      if (canTargets && b.targetChemists != null) { sets.push('target_chemists=?'); vals.push(Math.max(0, Number(b.targetChemists) || 0)); }
+      if (canSalary && b.salary != null) { sets.push('salary=?'); vals.push(Math.max(0, Number(b.salary) || 0)); }
       if (sets.length) db.prepare(`UPDATE users SET ${sets.join(',')} WHERE id=? AND org_id=?`).run(...vals, m[1], org);
       audit(org, user.uid, 'set-target:user', m[1]);
       const row = db.prepare('SELECT id,name,email,role,division_id as division,reports_to as reportsTo,city,target_doctors as targetDoctors,target_chemists as targetChemists,salary,phone FROM users WHERE id=? AND org_id=?').get(m[1], org);

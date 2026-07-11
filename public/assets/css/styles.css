@@ -541,3 +541,88 @@ html.is-mobile .page-hero h1{font-size:20px}
 .nav-items a:hover{background:rgba(255,255,255,.06);color:#fff}
 .nav-items a.active{background:color-mix(in srgb,var(--brand) 32%,transparent);color:#fff;font-weight:600}
 .nav-items a.active::before{content:"";position:absolute;left:26px;top:9px;bottom:9px;width:3px;border-radius:3px;background:var(--brand-2)}
+
+/* ============================================================================
+ * Blue gradient sidebar
+ * ==========================================================================*/
+.sidebar{background:radial-gradient(130% 120% at 82% 12%, #6b7cf4 0%, #3357f2 42%, #1f47e6 100%);color:#e6eaff;border-right:0}
+.sidebar .logo{color:#fff}
+.sidebar .logo-txt small{color:#c3cdff}
+.sidebar .brand-logo{width:34px;height:34px;padding:3px;box-shadow:0 2px 10px rgba(10,20,60,.28)}
+.nav-head .nav-head-label{color:#cfd7ff}
+.nav-head .ic{color:#c6d0ff}
+.nav-head:hover{background:rgba(255,255,255,.10);color:#fff}
+.nav-head:hover .ic{color:#fff}
+.nav-head .nav-chev{color:#b3bfff}
+.nav-sec.open>.nav-head .nav-head-label{color:#fff}
+.nav-sec.open>.nav-head .ic{color:#fff}
+.nav-items a{color:#e6eaff}
+.nav-items a:hover{background:rgba(255,255,255,.12);color:#fff}
+.nav-items a.active{background:rgba(255,255,255,.22);color:#fff;font-weight:600}
+.nav-items a.active::before{background:#fff}
+.sidebar .drawer-x{color:#e6eaff}
+.sidebar .drawer-x:hover{background:rgba(255,255,255,.14)}
+.sidebar::-webkit-scrollbar-thumb{background:rgba(255,255,255,.28)}
+.sidebar::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.4)}
+
+/* ============================================================================
+ * S17 — My Earnings screen
+ * ==========================================================================*/
+.earn{max-width:580px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+.earn-head{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.earn-head>div{display:flex;align-items:center;gap:8px}
+.earn-head h1{margin:0;font-size:24px;font-weight:800;letter-spacing:-.02em}
+.earn-head .btn.ghost.sm{padding:3px 10px;font-size:17px;line-height:1}
+.earn-month{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--ink-2);border:1px solid var(--line);border-radius:999px;padding:6px 13px;background:#fff;white-space:nowrap}
+.earn-hero{background:var(--brand-light);border:1px solid color-mix(in srgb,var(--brand) 20%,transparent);border-radius:16px;padding:16px 18px}
+.eh-label{font-size:13px;font-weight:600;color:var(--brand);margin-bottom:2px}
+.eh-amount{font-size:34px;font-weight:800;letter-spacing:-.02em;color:#1e40af;line-height:1.1}
+.eh-parts{font-size:13px;color:#1e40af;margin-top:8px;line-height:1.5}
+.eh-note{font-size:12px;color:#3b5bd0;margin-top:6px}
+.earn-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:15px 18px;box-shadow:var(--shadow-sm)}
+.earn-cap{font-size:12.5px;font-weight:600;color:var(--muted);display:block;margin-bottom:8px}
+.earn-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:5px 0;font-size:14px;color:var(--ink-2)}
+.earn-row b{font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap}
+.earn-row b.neg{color:var(--muted);font-weight:500}
+.earn-row.muted{color:var(--muted)}
+.earn-row.strong>span,.earn-row.strong>b{font-weight:700;color:var(--ink)}
+.earn-row.net{padding:8px 0}
+.earn-row.net>span{font-weight:800;font-size:16px;color:var(--ink)}
+.earn-row.net>b{font-weight:800;font-size:16px}
+.earn-sep{height:1px;background:var(--line);margin:6px 0}
+.earn-link{background:transparent;border:0;color:var(--brand);font-weight:600;font-size:13.5px;padding:9px 0 2px;cursor:pointer;text-align:left}
+.earn-link:hover{text-decoration:underline}
+.earn-ctc{margin-top:10px;padding-top:8px;border-top:1px dashed var(--line)}
+.earn-tile{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:var(--shadow-sm);min-width:0}
+.et-h{font-size:12.5px;color:var(--muted);font-weight:600}
+.et-v{font-size:21px;font-weight:800;letter-spacing:-.02em;margin:6px 0 3px;color:var(--ink)}
+.et-s{font-size:11.5px;color:var(--muted)}
+.earn-linkrow{display:flex;justify-content:space-between;align-items:center;padding:14px 0;font-size:14px;cursor:pointer;color:var(--ink-2)}
+.earn-linkrow b{color:var(--brand);font-weight:600;white-space:nowrap}
+.earn-linkrow:hover b{text-decoration:underline}
+.earn-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.earn-actions .btn{width:100%;justify-content:center;background:#fff;color:var(--ink-2);border:1px solid var(--line);box-shadow:none}
+.earn-actions .btn:hover{background:#f6f8fb;border-color:#d7dee7;color:var(--ink)}
+html.is-mobile .earn-actions{grid-template-columns:1fr}
+
+/* ============================================================================
+ * Numerals — clean, professional tabular lining figures across money & stats
+ * ==========================================================================*/
+/* tabular figures make columns of numbers line up perfectly */
+table td, table th, .earn-row, .earn-linkrow, .earn-month,
+.dbx-delta, .today-pill, .badge, .pill, .bar, .nav-badge,
+.eh-parts, .eh-note{
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
+}
+/* the big headline numbers: tabular, tight tracking, crisp */
+.eh-amount, .et-v, .earn-row.net > b, .earn-row.strong > b,
+.dbx-kpi-val, .kpi .val, .today-stat .v, .val,
+.earn-row > b, .earn-linkrow > b{
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1, "cv05" 1;
+  letter-spacing: -0.015em;
+}
+.eh-amount, .dbx-kpi-val{ letter-spacing: -0.03em; }
+/* right-aligned money in the earnings + payroll tables reads as a clean column */
+.earn-row > b, .earn-linkrow > b{ font-feature-settings: "tnum" 1, "lnum" 1; }

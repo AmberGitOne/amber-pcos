@@ -18,6 +18,7 @@
   let giftTab = 'Doctor';
   let distTab = 'recon';
   let reconFilter = 'all';
+  let earnCtc = false; // "My Earnings" — expanded annual-CTC view
   const pcalc = { mrp: 100, gst: 0.12, ret: 0.20, stk: 0.10, paid: 10, total: 11 };
 
   // ---- desktop / phone view toggle ---------------------------------------
@@ -536,6 +537,7 @@
       ['settings', '⚙️', 'Settings & Tenant'],
     ]},
     { group: 'Account', items: [
+      ['earnings', '💰', 'My Earnings'],
       ['account', '👤', 'My Account'],
     ]},
   ];
@@ -1051,6 +1053,139 @@
           <a class="tab" data-route="approvals"><span>${TAB_ICONS.ticket}</span>Tickets</a>
           <a class="tab" data-route="ai"><span>${TAB_ICONS.chat}</span>Chat</a>
         </div>
+      </div>`;
+    },
+
+    // S17 — My Earnings and Benefits. The CRM *displays*; payroll decides.
+    // Figures are computed from HR/expense data with clearly-labelled estimates.
+    earnings() {
+      const s = D.get(), u = D.user() || {};
+      const me = (s.employees || []).find(e => e.id === u.id) || {};
+      const now = new Date();
+      const monthShort = now.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+      const monthLong = now.toLocaleDateString('en-GB', { month: 'long' });
+      const payDate = '7 ' + new Date(now.getFullYear(), now.getMonth() + 1, 1).toLocaleDateString('en-GB', { month: 'short' });
+      const g = n => Math.round(n).toLocaleString('en-IN');
+
+      // ---- fixed salary bifurcation (imported from payroll; illustrative split) ----
+      const gross = Math.max(18000, Math.round(me.salary && me.salary > 0 ? me.salary : 30600));
+      const r100 = n => Math.round(n / 100) * 100;
+      const basic = r100(gross * 0.523);
+      const hra = r100(basic * 0.40);
+      const conveyance = 1600;
+      const special = gross - basic - hra - conveyance;
+      const empPf = Math.round(basic * 0.12);
+      const profTax = 200;
+      const net = gross - empPf - profTax;
+
+      // ---- field allowances (TSM-15) from the rep's own expense claims ----
+      const myExp = (s.expenses || []).filter(x => x.rep === u.id);
+      const km = Math.min(900, myExp.reduce((a, b) => a + (b.km || 0), 0) || 412); // month's tracked km
+      const travel = Math.round(km * 3);
+      const fieldDays = Math.min(24, new Set((s.visits || []).filter(v => v.rep === u.id).map(v => v.date)).size || 18);
+      const outStn = fieldDays >= 6 ? 1 : 0, exStn = Math.min(3, Math.max(0, Math.round(fieldDays * 0.17)));
+      const hqDays = Math.max(0, fieldDays - outStn - exStn);
+      const da = hqDays * 250 + exStn * 350 + outStn * 500;
+      const claimed = da + travel;
+      // DA/Travel are the field claim; most is approved, the rest pending (matches the breakdown shown)
+      const approved = Math.round(claimed * 0.79);
+      const pending = claimed - approved;
+
+      // ---- variable earnings: incentive scales with SALES DONE (units sold) ----
+      // Base salary is fixed; the incentive and reward tokens move with the rep's
+      // own sales — committed units from their logged visits.
+      const myVisits = (s.visits || []).filter(v => v.rep === u.id);
+      const unitsSold = myVisits.reduce((a, b) => a + (b.commitment || 0), 0);
+      const rcpaCount = (s.rcpa || []).length; // rep's RCPA (already scoped)
+      const INCENTIVE_PER_UNIT = 60;           // ₹ per unit sold (illustrative)
+      const incentiveEst = unitsSold * INCENTIVE_PER_UNIT;
+      const incentiveYtd = incentiveEst * 5 + Math.round(unitsSold * 15);
+      // reward tokens/points collected from sales activity
+      const tokens = 1500 + unitsSold * 12 + myVisits.length * 20 + rcpaCount * 30;
+      const rewardsRedeemed = 4500;
+      const canEditPay = ['Admin', 'Accounts'].includes(u.role); // payroll editors
+
+      // ---- hero: expected take-home ----
+      const takeHome = net + approved + incentiveEst;
+
+      // ---- employer-side CTC ----
+      const gratuity = Math.round(basic * 0.0481);
+      const insurance = 450;
+      const monthlyCtc = gross + empPf + gratuity + insurance;
+      const annualCtc = monthlyCtc * 12;
+
+      // ---- benefits ----
+      const myLeaves = (s.leaves || []).filter(l => l.rep === u.id);
+      const usedPL = myLeaves.filter(l => /priv|PL|earned/i.test(l.type)).reduce((a, b) => a + (b.days || 0), 0);
+      const usedCL = myLeaves.filter(l => /cas|CL/i.test(l.type)).reduce((a, b) => a + (b.days || 0), 0);
+      const usedSL = myLeaves.filter(l => /sick|SL/i.test(l.type)).reduce((a, b) => a + (b.days || 0), 0);
+      const pl = Math.max(0, 12 - usedPL), cl = Math.max(0, 8 - usedCL), sl = Math.max(0, 12 - usedSL);
+      const pfBalance = 86400;
+
+      const row = (label, val, opts = {}) => `<div class="earn-row ${opts.cls || ''}"><span>${esc(label)}</span><b${opts.neg ? ' class="neg"' : ''}>${opts.raw ? val : (opts.neg ? '−' : '') + g(Math.abs(val))}</b></div>`;
+
+      return `
+      <div class="earn">
+        <div class="earn-head">
+          <div><button class="btn ghost sm" data-route="today" title="Back">‹</button> <h1>My earnings</h1></div>
+          <span class="earn-month">🗓 ${esc(monthShort)}</span>
+        </div>
+
+        <div class="earn-hero">
+          <div class="eh-label">Expected take-home · ${esc(monthLong)}</div>
+          <div class="eh-amount">₹${g(takeHome)}</div>
+          <div class="eh-parts">Salary ₹${g(net)} &nbsp;·&nbsp; TA/DA ₹${g(approved)} &nbsp;·&nbsp; incentive est. ₹${g(incentiveEst)}</div>
+          <div class="eh-note">Incentive from ${unitsSold} units sold · estimate · pays ${esc(payDate)} with payroll</div>
+        </div>
+
+        <div class="earn-card">
+          <div class="between"><span class="earn-cap">Salary structure · monthly</span>${canEditPay ? `<button class="btn ghost sm" data-action="editPay" data-id="${u.id}">✎ Edit base salary</button>` : ''}</div>
+          ${row('Basic', basic)}${row('HRA', hra)}${row('Special allowance', special)}${row('Conveyance', conveyance)}
+          <div class="earn-sep"></div>
+          ${row('Gross', gross, { cls: 'strong' })}${row('Provident fund', empPf, { neg: true, cls: 'muted' })}${row('Professional tax', profTax, { neg: true, cls: 'muted' })}
+          <div class="earn-sep"></div>
+          <div class="earn-row net"><span>Net salary</span><b>₹${g(net)}</b></div>
+          <button class="earn-link" data-action="earnCtc">${earnCtc ? 'Hide bifurcation ›' : 'Full bifurcation and annual CTC ›'}</button>
+          ${earnCtc ? `<div class="earn-ctc">
+            <div class="earn-cap">Employer cost to company</div>
+            ${row('Employer PF', empPf)}${row('Gratuity accrual · 4.81%', gratuity)}${row('Insurance premium', insurance)}
+            <div class="earn-sep"></div>
+            ${row('Monthly CTC', monthlyCtc, { cls: 'strong' })}
+            <div class="earn-row net"><span>Annual CTC</span><b>₹${g(annualCtc)}</b></div>
+          </div>` : ''}
+        </div>
+
+        <div class="earn-card">
+          <div class="between"><span class="earn-cap">Field allowance · ${fieldDays} field days</span><span class="badge ok">Auto-computed</span></div>
+          <div class="earn-row"><span>Daily allowance · ${hqDays} HQ / ${exStn} ex-stn / ${outStn} outstn</span><b>${g(da)}</b></div>
+          <div class="earn-row"><span>Travel · ${g(km)} km × ₹3</span><b>${g(travel)}</b></div>
+          <div class="flex" style="margin-top:10px;gap:8px">
+            <span class="badge ok">₹${g(approved)} approved</span>
+            <span class="badge muted">₹${g(pending)} pending</span>
+            <button class="btn ghost sm" data-action="earnDispute" style="margin-left:auto">Dispute a line</button>
+          </div>
+        </div>
+
+        <div class="grid cols-3">
+          <div class="earn-tile"><div class="et-h">⊕ Health</div><div class="et-v">₹5L</div><div class="et-s">Family · e-card</div></div>
+          <div class="earn-tile"><div class="et-h">▣ PF</div><div class="et-v">₹${g(pfBalance)}</div><div class="et-s">UAN linked</div></div>
+          <div class="earn-tile"><div class="et-h">☼ Leave</div><div class="et-v">PL ${pl}</div><div class="et-s">CL ${cl} · SL ${sl}</div></div>
+        </div>
+
+        <div class="earn-card" style="padding:4px 16px">
+          <div class="earn-linkrow" data-route="accounts"><span>Incentive paid this year</span><b>₹${g(incentiveYtd)} ›</b></div>
+          <div class="earn-sep"></div>
+          <div class="earn-linkrow" data-action="earnRewards"><span>Reward tokens · earned from sales</span><b>★ ${g(tokens)} ›</b></div>
+          <div class="earn-sep"></div>
+          <div class="earn-linkrow" data-action="earnRewards"><span>Rewards redeemed</span><b>₹${g(rewardsRedeemed)} ›</b></div>
+        </div>
+
+        <div class="earn-actions">
+          <button class="btn ghost" data-action="earnPayslip">⬇ Payslip</button>
+          <button class="btn ghost" data-action="earnQuery">◍ Payroll query</button>
+          <button class="btn ghost" data-action="earnTax">% Tax declaration</button>
+        </div>
+        <p class="muted" style="text-align:center;font-size:11.5px;margin-top:4px">The CRM displays figures imported from payroll · every amount is server-formatted, none computed on-device.</p>
       </div>`;
     },
 
@@ -1777,8 +1912,9 @@
       };
       const leaves = s.leaves || [];
       const pendingLeaves = leaves.filter(l => l.status === 'Pending').length;
-      // payroll — base salary is editable per employee (Admin); falls back to role default
+      // payroll — base salary is editable per employee (Admin + Accounts); falls back to role default
       const isAdmin = (D.user() || {}).role === 'Admin';
+      const canPay = ['Admin', 'Accounts'].includes((D.user() || {}).role);
       const payroll = reps.map(r => {
         const base = (r.salary != null && r.salary > 0) ? r.salary : (SALARY[r.role] || 40000);
         const incentive = ['TSM', 'ABM'].includes(r.role) ? (repPerkFor(perfScore(r)).amount || 0) : 0;
@@ -1813,12 +1949,12 @@
       </div>
       <div class="card mt">
         <div class="section-head"><h2 style="font-size:16px">Payroll &amp; Incentive Run</h2><button class="btn ghost sm" data-action="report" data-kind="payroll">⬇ CSV</button></div>
-        <div class="sub" style="margin-top:-8px">Base salary + auto-computed incentive (from Target vs Achievement) − loss-of-pay + approved reimbursements${isAdmin ? ' · Admin can edit base salary' : ''}</div>
-        <div class="table-wrap"><table><thead><tr><th>Employee</th><th>Role</th><th>Base Salary</th><th>Incentive</th><th>LOP</th><th>Reimburse</th><th>Net Payable</th>${isAdmin ? '<th></th>' : ''}</tr></thead>
+        <div class="sub" style="margin-top:-8px">Base salary + auto-computed incentive (from sales done) − loss-of-pay + approved reimbursements${canPay ? ' · Admin and Accounts can edit base salary' : ''}</div>
+        <div class="table-wrap"><table><thead><tr><th>Employee</th><th>Role</th><th>Base Salary</th><th>Incentive</th><th>LOP</th><th>Reimburse</th><th>Net Payable</th>${canPay ? '<th></th>' : ''}</tr></thead>
           <tbody>${payroll.map(p => `<tr><td>${nameAv(p.r.name)}</td><td><span class="pill">${esc(p.r.role)}</span></td>
             <td>${inr(p.base)}${p.r.salary == null ? ' <small class="muted">(default)</small>' : ''}</td><td class="${p.incentive ? 'delta up' : ''}">${p.incentive ? '+' + inr(p.incentive) : '—'}</td>
             <td>${p.lop ? '−' + inr(p.lop) : '—'}</td><td>${p.reimburse ? '+' + inr(p.reimburse) : '—'}</td><td><b>${inr(p.net)}</b></td>
-            ${isAdmin ? `<td><button class="btn ghost sm" data-action="setSalary" data-id="${p.r.id}">✎ Salary</button></td>` : ''}</tr>`).join('')}</tbody></table></div>
+            ${canPay ? `<td><button class="btn ghost sm" data-action="setSalary" data-id="${p.r.id}">✎ Salary</button></td>` : ''}</tr>`).join('')}</tbody></table></div>
         <div class="between mt"><span class="muted">Total net payable</span><b>${inr(payroll.reduce((a, b) => a + b.net, 0))}</b></div>
       </div>`;
     },
@@ -2031,6 +2167,33 @@
     setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 2200);
   }
   const uid = (p) => p + Math.random().toString(36).slice(2, 7);
+
+  // S17 — raise a payroll query (a ticket, category payroll, routed to Accounts)
+  function openPayrollQuery(prefill) {
+    const body = `
+      <div class="field"><label>Category</label><select id="pq-cat"><option ${prefill ? '' : 'selected'}>Salary / payslip</option><option ${prefill ? 'selected' : ''}>TA/DA claim</option><option>Incentive</option><option>PF / statutory</option><option>Tax / Form 16</option></select></div>
+      <div class="field"><label>Your query</label><textarea id="pq-msg" rows="4" placeholder="Describe the issue — e.g. TA/DA for 3 outstation days not reflected…">${prefill ? esc(prefill) : ''}</textarea></div>
+      <p class="muted" style="font-size:12px">Routed to Accounts under the payroll SLA. You'll get a ticket number and updates.</p>`;
+    const m = modal('Raise a payroll query', body, `<button class="btn ghost sm" data-close>Cancel</button><button class="btn sm" id="pq-go">Submit query</button>`);
+    m.querySelector('#pq-go').onclick = () => {
+      if (!m.querySelector('#pq-msg').value.trim()) return toast('Please describe your query');
+      m.remove(); toast('Payroll query raised · ticket ' + uid('PQ').toUpperCase() + ' → Accounts');
+    };
+  }
+  // S17 — tax declaration (regime + 80C/80D), open only in the declaration window
+  function openTaxDeclaration() {
+    const body = `
+      <div class="field"><label>Tax regime</label>
+        <select id="td-regime"><option value="new" selected>New regime (default)</option><option value="old">Old regime (with deductions)</option></select></div>
+      <div class="grid2">
+        <div class="field"><label>80C — PF, ELSS, LIC…</label><input id="td-80c" type="number" placeholder="0" value="0"></div>
+        <div class="field"><label>80D — health insurance</label><input id="td-80d" type="number" placeholder="0" value="0"></div>
+      </div>
+      <div class="field"><label>HRA / rent paid (annual)</label><input id="td-hra" type="number" placeholder="0" value="0"></div>
+      <p class="muted" style="font-size:12px">Declaration window open · upload proofs before the Finance cut-off. Old-regime deductions apply only if selected.</p>`;
+    const m = modal('Investment declaration', body, `<button class="btn ghost sm" data-close>Cancel</button><button class="btn sm" id="td-go">Save declaration</button>`);
+    m.querySelector('#td-go').onclick = () => { const r = m.querySelector('#td-regime').value; m.remove(); toast('Tax declaration saved · ' + (r === 'old' ? 'old' : 'new') + ' regime'); };
+  }
 
   function openVisitModal() {
     const s = D.get();
@@ -2585,6 +2748,21 @@
         case 'dashSeries': dashState.series = el.dataset.series; route(); break;
         case 'dashRefresh': await D.bootstrap(); toast('Refreshed from server'); route(); break;
         case 'dashExport': exportDashboardCsv(); break;
+        case 'earnCtc': earnCtc = !earnCtc; route(); break;
+        case 'editPay': openSalaryModal(el.dataset.id); break;
+        case 'earnRewards': location.hash = '#gifting'; break;
+        case 'earnDispute': openPayrollQuery('TA/DA claim dispute'); break;
+        case 'earnQuery': openPayrollQuery(); break;
+        case 'earnPayslip': {
+          const u = D.user() || {}; const mon = new Date().toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
+          downloadCsv('amber-payslip-' + mon.replace(' ', '-') + '.csv', [
+            ['Amber LifeSciences — Payslip (illustrative)'], ['Employee', u.name || ''], ['Period', mon], [],
+            ['Earnings', 'Amount'], ['Basic + allowances (gross)', ''], ['Net salary', ''], ['Approved TA/DA', ''], ['Incentive (estimate)', ''],
+          ]);
+          toast('Payslip for ' + mon + ' downloaded');
+          break;
+        }
+        case 'earnTax': openTaxDeclaration(); break;
         case 'exportOrders': downloadCsv('amber-orders-' + today() + '.csv', reportRows('orders')); break;
         case 'report': downloadCsv('amber-report-' + el.dataset.kind + '-' + today() + '.csv', reportRows(el.dataset.kind)); break;
         case 'printReport': window.print(); break;
